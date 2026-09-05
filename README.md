@@ -28,6 +28,7 @@ EganowCard(
 | `isLoading` | You own this. While true the values stay concealed and shimmering, taps are ignored, and the contactless mark runs its chase. |
 | `animateContactless` / `contactlessCycle` | Whether the mark animates while loading, and how long one sweep takes. |
 | `legalText` | The small print on the back. Empty string leaves it off. |
+| `securityCodeLabel` | Captions the security code `CVV` (the default) or `CVC`, on the back and on the form field. Only the caption — the slot stays `EganowCardField.cvc`. |
 | `flipped` | Leave null to let the card manage its own flip; pass a value to drive it. |
 | `width` | Fills its parent when null. |
 

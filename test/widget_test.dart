@@ -616,6 +616,42 @@ void main() {
     expect(find.text(mask), findsNothing);
   });
 
+  group('the security code caption', () {
+    testWidgets('is CVV by default, on the back and in the form', (
+      tester,
+    ) async {
+      await pumpCard(
+        tester,
+        const EganowCard(
+          cvc: '418',
+          editable: {EganowCardField.cvc},
+          entry: EganowCardEntry.form,
+          flipped: true,
+        ),
+      );
+
+      // Once on the artwork, once as the form field's label.
+      expect(find.text('CVV'), findsNWidgets(2));
+      expect(find.text('CVC'), findsNothing);
+    });
+
+    testWidgets('follows securityCodeLabel', (tester) async {
+      await pumpCard(
+        tester,
+        const EganowCard(
+          cvc: '418',
+          editable: {EganowCardField.cvc},
+          entry: EganowCardEntry.form,
+          flipped: true,
+          securityCodeLabel: EganowSecurityCodeLabel.cvc,
+        ),
+      );
+
+      expect(find.text('CVC'), findsNWidgets(2));
+      expect(find.text('CVV'), findsNothing);
+    });
+  });
+
   testWidgets('a concealed editable field paints the mask, never the value', (
     tester,
   ) async {
