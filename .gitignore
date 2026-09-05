@@ -1,0 +1,31 @@
+# ---- Dart / Flutter package -------------------------------------------------
+.dart_tool/
+.packages
+/build/
+/coverage/
+**/doc/api/
+.widget_preview/
+
+# This is a library package, not an app: consumers resolve their own versions,
+# so the lockfile is not committed. (The host app commits its own.)
+pubspec.lock
+
+# ---- tool/ ------------------------------------------------------------------
+# The asset scripts are Python.
+__pycache__/
+*.pyc
+
+# ---- Editors ----------------------------------------------------------------
+*.iml
+*.ipr
+*.iws
+.idea/
+
+# .vscode holds launch configs and tasks that are often worth sharing —
+# uncomment to keep them out of version control.
+#.vscode/
+
+# ---- OS / misc --------------------------------------------------------------
+.DS_Store
+*.log
+*.swp
