@@ -8,7 +8,7 @@ state. Built to be dropped into a host app as an internal package.
 EganowCard(
   tier: EganowCardTier.boss,
   pan: '5399  8402  1174  4821',
-  holder: 'Alex Tantuo',
+  holder: 'Kwaku Ananse',
   expiry: '09/28',
   cvc: '418',
 )
@@ -91,10 +91,3 @@ values carries the wait on its own.
   rather than naming the families by hand, so the `package:` prefix that
   resolves them stays in one place. Both are SIL Open Font Licensed; the
   licences sit beside the faces.
-- **This is a package, not an app** — no `main.dart`, no platform folders.
-  The host app in [`../eganow_app`](../eganow_app) consumes it and is where
-  you run and exercise the card:
-
-  ```bash
-  cd ../eganow_app && flutter run -d macos
-  ```
