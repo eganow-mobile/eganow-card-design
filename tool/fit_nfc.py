@@ -4,7 +4,7 @@ import numpy as np
 from png_tool import read_png
 
 W, H = 2016, 1278
-SRC = '/Users/naj/Desktop/eganow/mockups/assets'
+SRC = '/Users/naj/Desktop/eganow/Cards/assets/images'
 BOX = (490, 445, 665, 660)
 
 img = read_png(f'{SRC}/eganow_boss_card.png')

@@ -28,6 +28,19 @@ enum EganowCardEntry {
   form,
 }
 
+/// Whether the card exists as a piece of plastic or only in the app.
+///
+/// Named `medium` rather than `form` throughout, so it is never mistaken for
+/// [EganowCardEntry.form], which is about where fields are typed, not about
+/// what kind of card this is.
+enum EganowCardMedium {
+  physical,
+  virtual;
+
+  /// The badge caption, e.g. `Virtual`.
+  String get label => '${name[0].toUpperCase()}${name.substring(1)}';
+}
+
 /// What the security code is called on this card. It is the same three digits
 /// either way — issuers and networks simply differ on what they print, so the
 /// label follows the card being represented rather than the code itself.
@@ -100,7 +113,7 @@ class EganowCardMetrics {
 /// EganowCard(
 ///   tier: EganowCardTier.boss,
 ///   pan: '5399  8402  1174  4821',
-///   holder: 'Alex Tantuo',
+///   holder: 'Kwaku Ananse',
 ///   expiry: '09/28',
 ///   cvc: '418',
 /// )
@@ -125,6 +138,7 @@ class EganowCard extends StatefulWidget {
     this.controllers,
     this.onChanged,
     this.legalText = defaultLegalText,
+    this.medium,
     this.securityCodeLabel = EganowSecurityCodeLabel.cvv,
     this.hideDetails = false,
     this.isLoading = false,
@@ -159,6 +173,15 @@ class EganowCard extends StatefulWidget {
 
   /// Fired whenever an editable field changes.
   final void Function(EganowCardField field, String value)? onChanged;
+
+  /// Badges the front of the card `Virtual` or `Physical`, top left.
+  ///
+  /// Left null — the default — no badge is drawn at all, so a card that has
+  /// no need to make the distinction looks exactly as it did before. It is
+  /// deliberately not concealed by [hideDetails]: which medium a card is
+  /// isn't a secret, and a badge blinking out alongside the real values would
+  /// only draw the eye.
+  final EganowCardMedium? medium;
 
   /// Whether the security code is captioned CVV or CVC — on the back of the
   /// card and, in form mode, on the field below it. Only the caption changes;
@@ -628,7 +651,7 @@ class _EganowCardState extends State<EganowCard>
 
   static String _formHint(EganowCardField field) => switch (field) {
     EganowCardField.pan => '0000  0000  0000  0000',
-    EganowCardField.holder => 'e.g. Alex Tantuo',
+    EganowCardField.holder => 'e.g. Kwaku Ananse',
     EganowCardField.expiry => 'MM/YY',
     EganowCardField.cvc => _concealedCvc,
   };
@@ -676,6 +699,36 @@ class _EganowCardState extends State<EganowCard>
             package: EganowCard.assetPackage,
             fit: BoxFit.cover,
           ),
+
+          // Medium badge, sharing the 9% margin the card number is set on and
+          // sitting clear above the chip (which starts at 37% of the height).
+          if (widget.medium != null)
+            Positioned(
+              left: w * 0.09,
+              top: h * 0.085,
+              child: DecoratedBox(
+                decoration: BoxDecoration(
+                  color: Colors.white.withValues(alpha: 0.22),
+                  borderRadius: BorderRadius.circular(m.cqw(1.6)),
+                ),
+                child: Padding(
+                  padding: EdgeInsets.symmetric(
+                    horizontal: m.cqw(2.2),
+                    vertical: m.cqw(1.2),
+                  ),
+                  child: Text(
+                    widget.medium!.label,
+                    style: EganowFonts.urbanist(
+                      color: Colors.white,
+                      fontSize: m.cqw(2.35),
+                      fontWeight: FontWeight.w600,
+                      letterSpacing: m.cqw(0.05),
+                      shadows: shadows,
+                    ),
+                  ),
+                ),
+              ),
+            ),
 
           // The mark is no longer part of the artwork — it is drawn here, and
           // only on a card that can be edited. It stays off for the whole of a
@@ -914,7 +967,6 @@ class _EganowCardState extends State<EganowCard>
   Widget _buildBack(EganowCardMetrics m) {
     final w = m.width;
     final h = m.height;
-    final holder = _valueOf(EganowCardField.holder).trim();
 
     return DecoratedBox(
       decoration: BoxDecoration(
@@ -965,7 +1017,9 @@ class _EganowCardState extends State<EganowCard>
               ),
             ),
 
-            // Signature panel.
+            // Signature panel. Left blank, the way an unsigned strip is — the
+            // holder's name belongs on the front, and repeating it here only
+            // gave the same value a second place to leak from.
             Positioned(
               left: w * 0.06,
               top: h * 0.35,
@@ -975,38 +1029,6 @@ class _EganowCardState extends State<EganowCard>
                 decoration: BoxDecoration(
                   borderRadius: BorderRadius.circular(m.cqw(0.5)),
                   gradient: _signatureWeave(m),
-                ),
-                child: Padding(
-                  padding: EdgeInsets.symmetric(horizontal: m.cqw(2.5)),
-                  child: Align(
-                    alignment: Alignment.centerLeft,
-                    child: _revealWrap(
-                      onDarkGround: false,
-                      Opacity(
-                        opacity:
-                            (holder.isEmpty &&
-                                !_isHidden(EganowCardField.holder))
-                            ? 0.35
-                            : 1,
-                        child: Text(
-                          _isHidden(EganowCardField.holder)
-                              ? _concealedName
-                              : (holder.isEmpty
-                                    ? 'Cardholder signature'
-                                    : holder),
-                          maxLines: 1,
-                          softWrap: false,
-                          overflow: TextOverflow.ellipsis,
-                          style: EganowFonts.urbanist(
-                            color: EganowColors.signatureInk,
-                            fontSize: m.cqw(4),
-                            fontWeight: FontWeight.w600,
-                            fontStyle: FontStyle.italic,
-                          ),
-                        ),
-                      ),
-                    ),
-                  ),
                 ),
               ),
             ),
@@ -1411,12 +1433,18 @@ class ContactlessMarkPainter extends CustomPainter {
   /// 0…1 and looping, or null to draw the mark at rest.
   final double? progress;
 
-  /// Fitted off the source artwork: centre as a fraction of card width and
-  /// height, radii and stroke as fractions of width.
-  static const double _centreX = 0.24777;
+  /// Fitted off the source artwork — centre as a fraction of card width and
+  /// height, radii and stroke as fractions of width — then drawn at 85% of
+  /// that fit, which reads better against the chip than the printed mark did.
+  ///
+  /// Scaling alone would have pulled the mark leftwards, since the arcs shrink
+  /// towards an origin that sits outside them; the centre is nudged right to
+  /// compensate, so the smaller mark keeps the printed one's optical position
+  /// rather than drifting towards the chip.
+  static const double _centreX = 0.25347;
   static const double _centreY = 0.43545;
-  static const List<double> _radii = [0.01982, 0.03351, 0.04883, 0.06462];
-  static const double _stroke = 0.00729;
+  static const List<double> _radii = [0.01685, 0.02848, 0.04151, 0.05493];
+  static const double _stroke = 0.0062;
 
   /// The arcs open rightwards, each spanning a little less than the one
   /// inside it — measured, not assumed.

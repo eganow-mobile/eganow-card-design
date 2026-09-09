@@ -28,6 +28,7 @@ EganowCard(
 | `isLoading` | You own this. While true the values stay concealed and shimmering, taps are ignored, and the contactless mark runs its chase. |
 | `animateContactless` / `contactlessCycle` | Whether the mark animates while loading, and how long one sweep takes. |
 | `legalText` | The small print on the back. Empty string leaves it off. |
+| `medium` | Badges the front `Virtual` or `Physical`, top left. Null (the default) draws no badge. Not concealed by `hideDetails` — which medium a card is isn't a secret. |
 | `securityCodeLabel` | Captions the security code `CVV` (the default) or `CVC`, on the back and on the form field. Only the caption — the slot stays `EganowCardField.cvc`. |
 | `flipped` | Leave null to let the card manage its own flip; pass a value to drive it. |
 | `width` | Fills its parent when null. |
@@ -67,8 +68,9 @@ setState(() => loading = false);
 
 It used to be baked into the artwork, which made it impossible to animate. It
 has been inpainted out of both PNGs and is drawn by the widget instead, at
-geometry fitted to the original so it lands exactly where it was printed. See
-[`tool/README.md`](tool/README.md).
+geometry fitted to the original — then drawn at 85% of that fit, which sits
+better against the chip, re-centred so the smaller mark holds the printed one's
+optical position. See [`tool/README.md`](tool/README.md).
 
 Solid at rest; while loading, a highlight travels outward through the arcs.
 

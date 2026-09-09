@@ -7,6 +7,7 @@ export 'src/eganow_card.dart'
         EganowCard,
         EganowCardEntry,
         EganowCardField,
+        EganowCardMedium,
         EganowCardMetrics,
         EganowCardTier,
         EganowCardTierArt,
