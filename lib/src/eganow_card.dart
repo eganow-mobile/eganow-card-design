@@ -28,6 +28,16 @@ enum EganowCardEntry {
   form,
 }
 
+/// What the security code is called on this card. It is the same three digits
+/// either way — issuers and networks simply differ on what they print, so the
+/// label follows the card being represented rather than the code itself.
+enum EganowSecurityCodeLabel {
+  cvv,
+  cvc;
+
+  String get label => name.toUpperCase();
+}
+
 /// The four data slots on the card. Pass any of these in [EganowCard.editable]
 /// to turn that slot into a live text field on the artwork itself.
 enum EganowCardField { pan, holder, expiry, cvc }
@@ -115,6 +125,7 @@ class EganowCard extends StatefulWidget {
     this.controllers,
     this.onChanged,
     this.legalText = defaultLegalText,
+    this.securityCodeLabel = EganowSecurityCodeLabel.cvv,
     this.hideDetails = false,
     this.isLoading = false,
     this.animateContactless = true,
@@ -148,6 +159,11 @@ class EganowCard extends StatefulWidget {
 
   /// Fired whenever an editable field changes.
   final void Function(EganowCardField field, String value)? onChanged;
+
+  /// Whether the security code is captioned CVV or CVC — on the back of the
+  /// card and, in form mode, on the field below it. Only the caption changes;
+  /// the slot is [EganowCardField.cvc] whichever name is shown.
+  final EganowSecurityCodeLabel securityCodeLabel;
 
   /// Conceals the card's data: the PAN keeps only its last four digits, and
   /// the holder, expiry, CVC and signature are blurred out. An editable field
@@ -603,11 +619,11 @@ class _EganowCardState extends State<EganowCard>
     );
   }
 
-  static String _formLabel(EganowCardField field) => switch (field) {
+  String _formLabel(EganowCardField field) => switch (field) {
     EganowCardField.pan => 'Card number',
     EganowCardField.holder => 'Name on card',
     EganowCardField.expiry => 'Expiry',
-    EganowCardField.cvc => 'CVV',
+    EganowCardField.cvc => widget.securityCodeLabel.label,
   };
 
   static String _formHint(EganowCardField field) => switch (field) {
@@ -1014,7 +1030,7 @@ class _EganowCardState extends State<EganowCard>
               left: w * 0.67,
               top: h * 0.505,
               child: Text(
-                'CVV',
+                widget.securityCodeLabel.label,
                 style: EganowFonts.urbanist(
                   color: Colors.white.withValues(alpha: 0.75),
                   fontSize: m.cqw(2.3),
