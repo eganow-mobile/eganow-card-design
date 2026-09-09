@@ -3,10 +3,11 @@ import numpy as np
 from png_tool import read_png, write_png
 
 W, H = 2016, 1278
-CX, CY = 0.24777 * W, 0.43545 * H
-RADII = [r * W for r in (0.01982, 0.03351, 0.04883, 0.06462)]
+# Mirrors ContactlessMarkPainter: the fit, scaled to 85% and re-centred.
+CX, CY = 0.25347 * W, 0.43545 * H
+RADII = [r * W for r in (0.01685, 0.02848, 0.04151, 0.05493)]
 SWEEPS = [62.5, 49.9, 46.2, 43.8]
-STROKE = 0.00729 * W
+STROKE = 0.0062 * W
 FALLOFF, DIM = 1.35, 0.2
 
 

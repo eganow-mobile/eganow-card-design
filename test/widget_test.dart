@@ -616,6 +616,94 @@ void main() {
     expect(find.text(mask), findsNothing);
   });
 
+  testWidgets('the back carries no cardholder name', (tester) async {
+    await pumpCard(
+      tester,
+      const EganowCard(
+        pan: EganowCard.samplePan,
+        holder: 'Alex Tantuo',
+        expiry: '09/28',
+        cvc: '418',
+        flipped: true,
+      ),
+    );
+
+    // The signature strip is blank: neither the name, nor the old placeholder,
+    // nor the concealment mask that used to stand in for it.
+    expect(find.text('Alex Tantuo'), findsNothing);
+    expect(find.text('ALEX TANTUO'), findsNothing);
+    expect(find.text('Cardholder signature'), findsNothing);
+    expect(find.text('••••••••••••'), findsNothing);
+  });
+
+  testWidgets('and still carries none when the details are concealed', (
+    tester,
+  ) async {
+    await pumpCard(
+      tester,
+      const EganowCard(
+        pan: EganowCard.samplePan,
+        holder: 'Alex Tantuo',
+        cvc: '418',
+        flipped: true,
+        hideDetails: true,
+      ),
+    );
+
+    expect(find.text('Alex Tantuo'), findsNothing);
+    expect(find.text('ALEX TANTUO'), findsNothing);
+    expect(find.text('••••••••••••'), findsNothing);
+  });
+
+  group('the medium badge', () {
+    testWidgets('is absent unless a medium is given', (tester) async {
+      await pumpCard(tester, const EganowCard(pan: EganowCard.samplePan));
+      expect(find.text('Virtual'), findsNothing);
+      expect(find.text('Physical'), findsNothing);
+    });
+
+    for (final (medium, caption) in [
+      (EganowCardMedium.virtual, 'Virtual'),
+      (EganowCardMedium.physical, 'Physical'),
+    ]) {
+      testWidgets('captions the front $caption', (tester) async {
+        await pumpCard(
+          tester,
+          EganowCard(pan: EganowCard.samplePan, medium: medium),
+        );
+        expect(find.text(caption), findsOneWidget);
+      });
+    }
+
+    testWidgets('stays put while the values are concealed', (tester) async {
+      // The medium isn't a secret, so hideDetails must not take it with it.
+      await pumpCard(
+        tester,
+        const EganowCard(
+          pan: EganowCard.samplePan,
+          holder: 'Kwaku Ananse',
+          medium: EganowCardMedium.virtual,
+          hideDetails: true,
+        ),
+      );
+      expect(find.text('Virtual'), findsOneWidget);
+      expect(find.text('••••••••••••'), findsOneWidget);
+    });
+
+    testWidgets('belongs to the front, not the back', (tester) async {
+      await pumpCard(
+        tester,
+        const EganowCard(
+          pan: EganowCard.samplePan,
+          cvc: '418',
+          medium: EganowCardMedium.virtual,
+          flipped: true,
+        ),
+      );
+      expect(find.text('Virtual'), findsNothing);
+    });
+  });
+
   group('the security code caption', () {
     testWidgets('is CVV by default, on the back and in the form', (
       tester,
