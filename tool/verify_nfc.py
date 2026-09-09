@@ -8,7 +8,7 @@ RADII = [r * W for r in (0.01982, 0.03351, 0.04883, 0.06462)]
 SWEEPS = [62.5, 49.9, 46.2, 43.8]
 STROKE = 0.00729 * W
 
-SRC = '/Users/naj/Desktop/eganow/mockups/assets'
+SRC = '/Users/naj/Desktop/eganow/Cards/assets/images'
 BOX = (490, 445, 665, 660)
 
 for name in ('eganow_boss_card', 'eganow_freedom_card'):
