@@ -28,6 +28,10 @@ EganowCard(
 | `isLoading` | You own this. While true the values stay concealed and shimmering, taps are ignored, and the contactless mark runs its chase. It never hides the mark — the mark is always drawn. |
 | `animateContactless` / `contactlessCycle` | Whether the mark animates while loading, and how long one sweep takes. |
 | `legalText` | The small print on the back. Empty string leaves it off. |
+| `balance` | The formatted amount shown on the right of the front, with an eye beside it. Printed verbatim — grouping and rounding are yours. Null draws nothing. |
+| `currency` | The currency `balance` is in, e.g. `GHS`. Kept separate because it survives concealment. |
+| `hideBalance` | Whether the balance is concealed. Null (the default) lets the card own the eye; pass a value to drive it. Independent of `hideDetails` — see below. |
+| `onBalanceVisibilityChanged` | Fires with the concealment state being asked for when the eye is tapped, driven or not. |
 | `medium` | Badges the front `Virtual` or `Physical`, top left. Null (the default) draws no badge. Not concealed by `hideDetails` — which medium a card is isn't a secret. |
 | `securityCodeLabel` | Captions the security code `CVV` (the default) or `CVC`, on the back and on the form field. Only the caption — the slot stays `EganowCardField.cvc`. |
 | `flipped` | Leave null to let the card manage its own flip; pass a value to drive it. |
@@ -53,6 +57,40 @@ the text jumping. It dips through zero rather than cross-dissolving on
 purpose: a cross-dissolve would have to paint the real characters underneath
 the mask, and concealment promises they never reach the screen at all.
 Focusing a field to type into it still reveals it immediately — no fade.
+
+## The balance
+
+`balance` is printed verbatim, so formatting is the caller's. The eye beside it
+toggles concealment, replacing the figure with a fixed-length `••••••` — fixed
+so a concealed balance doesn't leak its magnitude the way a per-digit mask
+would.
+
+`currency` is a separate parameter rather than part of `balance` because it
+rides through concealment: a hidden balance reads `GHS••••••`, which still
+tells the holder which account they are looking at. Hiding a balance is about
+the figure, not about which currency you hold.
+
+**It has nothing to do with `hideDetails`.** A balance is worth covering in a
+room full of people while the card number is on show, and worth showing while
+the number is masked; tying the two together would make either impossible.
+
+Left null, `hideBalance` lets the card own the toggle. Pass a value and you own
+it — the eye then only reports through `onBalanceVisibilityChanged` and the
+card waits to be given the new value, the same contract `flipped` uses:
+
+```dart
+EganowCard(
+  balance: '1,000.00',
+  currency: 'GHS ',
+  hideBalance: _hidden,
+  onBalanceVisibilityChanged: (hidden) => setState(() => _hidden = hidden),
+)
+```
+
+The eye sits deeper in the tree than the card's tap-to-flip, so it wins the
+gesture arena — revealing a balance never turns the card over by accident. The
+row is anchored to the right margin, so the eye keeps its place when the
+shorter mask swaps in rather than sliding out from under your finger.
 
 ## Loading
 
