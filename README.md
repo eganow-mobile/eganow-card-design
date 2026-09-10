@@ -20,12 +20,12 @@ EganowCard(
 | --- | --- |
 | `tier` | Which design to render — picks the artwork, its measured corner radius, and the back gradient. |
 | `pan` `holder` `expiry` `cvc` | Values. For an editable field these seed its controller. |
-| `editable` | The set of fields that can be edited. Leave it empty for a read-only card — see below. |
+| `editable` | The set of fields that can be edited. Leave it empty for a read-only card: no inputs and no form. |
 | `entry` | `onCard` types in place on the artwork; `form` keeps the card read-only and collects the fields beneath it. |
 | `controllers` | Supply your own per field to drive the card from an enclosing form. |
 | `onChanged` | Fires as `(field, value)` on every edit. |
 | `hideDetails` | Conceals the values — see below. |
-| `isLoading` | You own this. While true the values stay concealed and shimmering, taps are ignored, and the contactless mark runs its chase. |
+| `isLoading` | You own this. While true the values stay concealed and shimmering, taps are ignored, and the contactless mark runs its chase. It never hides the mark — the mark is always drawn. |
 | `animateContactless` / `contactlessCycle` | Whether the mark animates while loading, and how long one sweep takes. |
 | `legalText` | The small print on the back. Empty string leaves it off. |
 | `medium` | Badges the front `Virtual` or `Physical`, top left. Null (the default) draws no badge. Not concealed by `hideDetails` — which medium a card is isn't a secret. |
@@ -74,11 +74,14 @@ optical position. See [`tool/README.md`](tool/README.md).
 
 Solid at rest; while loading, a highlight travels outward through the arcs.
 
-It is drawn only on a card that can be edited. Leave `editable` empty and the
-card is read-only — no on-card inputs, no form even under
-`EganowCardEntry.form`, and no mark, since a card you cannot edit isn't one you
-are about to tap to pay with. That holds while loading too; the shimmer on the
-values carries the wait on its own.
+The mark is always drawn. It is part of the card's face rather than a state of
+it, so neither `editable` nor `isLoading` takes it away — `isLoading` only sets
+the highlight travelling through it, and a read-only card wears it exactly as
+an editable one does.
+
+Leave `editable` empty and the card is read-only — no on-card inputs, and no
+form even under `EganowCardEntry.form`. That governs what can be typed into,
+nothing about the mark.
 
 ## Packaging notes
 
