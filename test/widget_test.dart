@@ -677,6 +677,138 @@ void main() {
     expect(find.text('••••••••••••'), findsNothing);
   });
 
+  group('the balance', () {
+    Finder eye() => find.byIcon(Icons.visibility_outlined);
+    Finder eyeOff() => find.byIcon(Icons.visibility_off_outlined);
+
+    /// The balance is a [Text.rich], so it has to be read span-and-all —
+    /// the currency and the figure are separate spans.
+    String balanceText(WidgetTester tester) => tester
+        .widgetList<RichText>(find.byType(RichText))
+        .map((w) => w.text.toPlainText())
+        .firstWhere((t) => t.contains('GHS'), orElse: () => '<none>');
+
+    testWidgets('is absent unless a balance is given', (tester) async {
+      await pumpCard(tester, const EganowCard(pan: EganowCard.samplePan));
+      expect(eye(), findsNothing);
+      expect(eyeOff(), findsNothing);
+    });
+
+    testWidgets('shows the value verbatim, with an open eye', (tester) async {
+      await pumpCard(
+        tester,
+        const EganowCard(
+          pan: EganowCard.samplePan,
+          balance: '1000',
+          currency: 'GHS',
+        ),
+      );
+      expect(balanceText(tester), 'GHS1000');
+      expect(eye(), findsOneWidget);
+    });
+
+    testWidgets('the eye conceals and reveals, and reports both ways', (
+      tester,
+    ) async {
+      final seen = <bool>[];
+      await pumpCard(
+        tester,
+        EganowCard(
+          pan: EganowCard.samplePan,
+          balance: '1000',
+          currency: 'GHS',
+          onBalanceVisibilityChanged: seen.add,
+        ),
+      );
+
+      await tester.tap(eye());
+      await settle(tester);
+      // The currency rides through concealment; only the figure is masked.
+      expect(balanceText(tester), 'GHS••••••');
+      expect(eyeOff(), findsOneWidget);
+
+      await tester.tap(eyeOff());
+      await settle(tester);
+      expect(balanceText(tester), 'GHS1000');
+      expect(seen, [true, false]);
+    });
+
+    testWidgets('a driven card reports but does not move itself', (
+      tester,
+    ) async {
+      final seen = <bool>[];
+      await pumpCard(
+        tester,
+        EganowCard(
+          pan: EganowCard.samplePan,
+          balance: '1000',
+          currency: 'GHS',
+          hideBalance: true,
+          onBalanceVisibilityChanged: seen.add,
+        ),
+      );
+      expect(balanceText(tester), 'GHS••••••');
+
+      await tester.tap(eyeOff());
+      await settle(tester);
+
+      // The caller owns the value, so the card waits to be given the new one.
+      expect(seen, [false]);
+      expect(balanceText(tester), 'GHS••••••');
+    });
+
+    testWidgets('is not concealed by hideDetails', (tester) async {
+      await pumpCard(
+        tester,
+        const EganowCard(
+          pan: EganowCard.samplePan,
+          holder: 'Kwaku Ananse',
+          balance: '1000',
+          currency: 'GHS',
+          hideDetails: true,
+        ),
+      );
+      expect(balanceText(tester), 'GHS1000');
+      expect(find.text('••••••••••••'), findsOneWidget);
+    });
+
+    testWidgets('and does not conceal the rest of the card', (tester) async {
+      await pumpCard(
+        tester,
+        const EganowCard(
+          pan: EganowCard.samplePan,
+          holder: 'Kwaku Ananse',
+          balance: '1000',
+          currency: 'GHS',
+          hideBalance: true,
+        ),
+      );
+      expect(balanceText(tester), 'GHS••••••');
+      expect(find.text(EganowCard.samplePan), findsOneWidget);
+      expect(find.text('KWAKU ANANSE'), findsOneWidget);
+    });
+
+    testWidgets('tapping the eye does not turn the card over', (tester) async {
+      await pumpCard(
+        tester,
+        const EganowCard(
+          pan: EganowCard.samplePan,
+          cvc: '418',
+          balance: '1000',
+          currency: 'GHS',
+        ),
+      );
+
+      await tester.tap(eye());
+      await settle(tester);
+
+      // The eye's gesture sits deeper than the card's tap-to-flip, so it
+      // wins the arena outright.
+      expect(find.text('CVV'), findsNothing);
+      expect(balanceText(tester), 'GHS••••••');
+    });
+  });
+
   group('the medium badge', () {
     testWidgets('is absent unless a medium is given', (tester) async {
       await pumpCard(tester, const EganowCard(pan: EganowCard.samplePan));

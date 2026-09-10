@@ -15,6 +15,10 @@ const String _concealedName = '••••••••••••';
 const String _concealedExpiry = '••/••';
 const String _concealedCvc = '•••';
 
+/// A fixed-length run, so a concealed balance doesn't leak its magnitude the
+/// way a per-digit mask would — `••••••` reads the same for 5 and 50,000.
+const String _concealedBalance = '••••••';
+
 /// Which card design to render. The tier picks the artwork, its measured
 /// corner radius and the gradient on the back.
 enum EganowCardTier { boss, freedom }
@@ -138,6 +142,10 @@ class EganowCard extends StatefulWidget {
     this.controllers,
     this.onChanged,
     this.legalText = defaultLegalText,
+    this.balance,
+    this.currency,
+    this.hideBalance,
+    this.onBalanceVisibilityChanged,
     this.medium,
     this.securityCodeLabel = EganowSecurityCodeLabel.cvv,
     this.hideDetails = false,
@@ -173,6 +181,40 @@ class EganowCard extends StatefulWidget {
 
   /// Fired whenever an editable field changes.
   final void Function(EganowCardField field, String value)? onChanged;
+
+  /// The balance amount shown on the front, already formatted — the card
+  /// prints it verbatim, so grouping and rounding are the caller's.
+  ///
+  /// Null, the default, draws no balance and no eye at all. Pass the currency
+  /// separately in [currency] rather than baking it in here, so it can stay
+  /// on show once the amount is concealed.
+  final String? balance;
+
+  /// The currency [balance] is denominated in, e.g. `GHS`.
+  ///
+  /// Kept out of [balance] because it survives concealment: hiding a balance
+  /// is about the figure, not about which currency you hold. A concealed
+  /// balance reads `GHS••••••`, which still tells the holder they are looking
+  /// at the right account.
+  final String? currency;
+
+  /// Whether the balance is concealed.
+  ///
+  /// Leave null — the default — and the card owns the toggle: the eye flips it
+  /// and the card rebuilds itself. Pass a value to drive it from outside, in
+  /// which case the eye only reports through [onBalanceVisibilityChanged] and
+  /// the card waits to be given the new value, as [flipped] does.
+  ///
+  /// This is deliberately nothing to do with [hideDetails]. A balance is worth
+  /// covering in a room full of people even while the card number is on show,
+  /// and worth showing while the number is masked; tying the two together
+  /// would make either impossible.
+  final bool? hideBalance;
+
+  /// Fired when the eye is tapped, with the concealment state being asked for.
+  /// It fires whether or not the card owns the toggle, so a driven card still
+  /// hears about the tap.
+  final ValueChanged<bool>? onBalanceVisibilityChanged;
 
   /// Badges the front of the card `Virtual` or `Physical`, top left.
   ///
@@ -250,6 +292,7 @@ class _EganowCardState extends State<EganowCard> with TickerProviderStateMixin {
   final _focus = <EganowCardField, FocusNode>{};
 
   bool _selfFlipped = false;
+  bool _selfBalanceHidden = false;
 
   late final AnimationController _contactless = AnimationController(
     vsync: this,
@@ -276,6 +319,17 @@ class _EganowCardState extends State<EganowCard> with TickerProviderStateMixin {
 
   bool get _selfManaged => widget.flipped == null;
   bool get _flipped => widget.flipped ?? _selfFlipped;
+
+  bool get _balanceHidden => widget.hideBalance ?? _selfBalanceHidden;
+
+  void _toggleBalance() {
+    final next = !_balanceHidden;
+    // Only move state we own; a driven card is the caller's to change.
+    if (widget.hideBalance == null) {
+      setState(() => _selfBalanceHidden = next);
+    }
+    widget.onBalanceVisibilityChanged?.call(next);
+  }
 
   @override
   void initState() {
@@ -750,6 +804,9 @@ class _EganowCardState extends State<EganowCard> with TickerProviderStateMixin {
             ),
           ),
 
+          // Balance, set against the right margin at the chip's own height.
+          if (widget.balance != null) _balanceSlot(m, shadows),
+
           // Card number.
           Positioned(
             left: w * 0.09,
@@ -777,6 +834,65 @@ class _EganowCardState extends State<EganowCard> with TickerProviderStateMixin {
             ),
           ),
         ],
+      ),
+    );
+  }
+
+  /// The balance and its eye, right-aligned level with the chip.
+  ///
+  /// The eye carries its own gesture, which wins the arena against the card's
+  /// tap-to-flip because it sits deeper in the tree — so revealing a balance
+  /// never turns the card over by accident.
+  Widget _balanceSlot(EganowCardMetrics m, List<Shadow> shadows) {
+    final hidden = _balanceHidden;
+
+    return Positioned(
+      right: m.width * 0.09,
+      top: m.height * 0.398,
+      child: _revealWrap(
+        Row(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.center,
+          children: [
+            Text.rich(
+              TextSpan(
+                children: [
+                  // The currency is not concealed with the figure — see
+                  // [EganowCard.currency].
+                  if (widget.currency != null) TextSpan(text: widget.currency),
+                  TextSpan(text: hidden ? _concealedBalance : widget.balance!),
+                ],
+              ),
+              maxLines: 1,
+              softWrap: false,
+              style: EganowFonts.urbanist(
+                color: Colors.white,
+                fontSize: m.cqw(4),
+                fontWeight: FontWeight.w700,
+                letterSpacing: m.cqw(0.08),
+                shadows: shadows,
+              ),
+            ),
+            SizedBox(width: m.cqw(1.5)),
+            GestureDetector(
+              onTap: _toggleBalance,
+              // Opaque so the whole padded square is a target, not just the
+              // glyph's own strokes.
+              behavior: HitTestBehavior.opaque,
+              child: Padding(
+                padding: EdgeInsets.all(m.cqw(0.8)),
+                child: Icon(
+                  hidden
+                      ? Icons.visibility_off_outlined
+                      : Icons.visibility_outlined,
+                  size: m.cqw(4.6),
+                  color: Colors.white,
+                  shadows: shadows,
+                ),
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
