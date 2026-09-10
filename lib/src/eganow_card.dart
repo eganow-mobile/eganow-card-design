@@ -245,8 +245,7 @@ class EganowCard extends StatefulWidget {
   State<EganowCard> createState() => _EganowCardState();
 }
 
-class _EganowCardState extends State<EganowCard>
-    with TickerProviderStateMixin {
+class _EganowCardState extends State<EganowCard> with TickerProviderStateMixin {
   final _owned = <EganowCardField, TextEditingController>{};
   final _focus = <EganowCardField, FocusNode>{};
 
@@ -282,9 +281,7 @@ class _EganowCardState extends State<EganowCard>
   void initState() {
     super.initState();
     _wireFields();
-    if (widget.isLoading && widget.animateContactless && !_readOnly) {
-      _contactless.repeat();
-    }
+    if (_chaseRunning) _contactless.repeat();
   }
 
   /// Whether the values should be concealed, ignoring the dip in progress.
@@ -329,8 +326,7 @@ class _EganowCardState extends State<EganowCard>
       _dip();
     }
 
-    final shouldRun =
-        widget.isLoading && widget.animateContactless && !_readOnly;
+    final shouldRun = _chaseRunning;
     if (shouldRun && !_contactless.isAnimating) {
       _contactless.repeat();
     } else if (!shouldRun && _contactless.isAnimating) {
@@ -455,9 +451,15 @@ class _EganowCardState extends State<EganowCard>
   }
 
   /// Display-only: nothing on the card can be typed into, so no on-card
-  /// inputs and no form are built, and the contactless mark is left off — a
-  /// card you cannot edit isn't one you are about to tap to pay with.
+  /// inputs and no form are built. It says nothing about the contactless
+  /// mark, which is printed on every card whether or not this one can be
+  /// edited.
   bool get _readOnly => widget.editable.isEmpty;
+
+  /// Whether the chase is travelling. This is the whole of what [isLoading]
+  /// controls: the mark itself is always drawn, and loading only decides
+  /// whether the highlight is running through it.
+  bool get _chaseRunning => widget.isLoading && widget.animateContactless;
 
   /// Rendered as an input on the artwork itself.
   bool _isEditable(EganowCardField field) =>
@@ -555,7 +557,7 @@ class _EganowCardState extends State<EganowCard>
       child: sized,
     );
 
-    if (widget.entry == EganowCardEntry.onCard || widget.editable.isEmpty) {
+    if (widget.entry == EganowCardEntry.onCard || _readOnly) {
       return tappable;
     }
 
@@ -731,24 +733,22 @@ class _EganowCardState extends State<EganowCard>
             ),
 
           // The mark is no longer part of the artwork — it is drawn here, and
-          // only on a card that can be edited. It stays off for the whole of a
-          // read-only card's life, loading included; the shimmer on the values
-          // carries the wait on its own.
-          if (!_readOnly)
-            Positioned.fill(
-              child: RepaintBoundary(
-                child: widget.isLoading && widget.animateContactless
-                    ? AnimatedBuilder(
-                        animation: _contactless,
-                        builder: (context, _) => CustomPaint(
-                          painter: ContactlessMarkPainter(
-                            progress: _contactless.value,
-                          ),
+          // drawn always: it is part of the card's face, not a state of it.
+          // Loading only sets the highlight travelling through it.
+          Positioned.fill(
+            child: RepaintBoundary(
+              child: _chaseRunning
+                  ? AnimatedBuilder(
+                      animation: _contactless,
+                      builder: (context, _) => CustomPaint(
+                        painter: ContactlessMarkPainter(
+                          progress: _contactless.value,
                         ),
-                      )
-                    : const CustomPaint(painter: ContactlessMarkPainter()),
-              ),
+                      ),
+                    )
+                  : const CustomPaint(painter: ContactlessMarkPainter()),
             ),
+          ),
 
           // Card number.
           Positioned(

@@ -507,22 +507,44 @@ void main() {
       (w) => w is CustomPaint && w.painter is ContactlessMarkPainter,
     );
 
-    testWidgets('leaves the contactless mark off', (tester) async {
-      await pumpCard(tester, const EganowCard(pan: EganowCard.samplePan));
-      expect(markFinder(), findsNothing);
-    });
+    // The mark is part of the card's face, not a state of it, so `editable`
+    // and `isLoading` between them never take it away.
+    for (final (name, card) in [
+      ('at rest', EganowCard(pan: EganowCard.samplePan)),
+      (
+        'while loading',
+        EganowCard(pan: EganowCard.samplePan, isLoading: true),
+      ),
+      (
+        'while loading with the chase disabled',
+        EganowCard(
+          pan: EganowCard.samplePan,
+          isLoading: true,
+          animateContactless: false,
+        ),
+      ),
+    ]) {
+      testWidgets('still wears the contactless mark $name', (tester) async {
+        await pumpCard(tester, card);
+        expect(markFinder(), findsOneWidget);
+      });
+    }
 
-    testWidgets('leaves it off while loading, too', (tester) async {
+    testWidgets('wears it either side of a fetch', (tester) async {
       await pumpCard(
         tester,
         const EganowCard(pan: EganowCard.samplePan, isLoading: true),
       );
-      expect(markFinder(), findsNothing);
+      expect(markFinder(), findsOneWidget);
+
+      await tester.pumpWidget(
+        wrap(const EganowCard(pan: EganowCard.samplePan)),
+      );
+      await settle(tester);
+      expect(markFinder(), findsOneWidget);
     });
 
-    testWidgets('still draws the mark once a field is editable', (
-      tester,
-    ) async {
+    testWidgets('wears it once a field is editable too', (tester) async {
       await pumpCard(
         tester,
         const EganowCard(
