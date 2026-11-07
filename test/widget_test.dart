@@ -511,10 +511,7 @@ void main() {
     // and `isLoading` between them never take it away.
     for (final (name, card) in [
       ('at rest', EganowCard(pan: EganowCard.samplePan)),
-      (
-        'while loading',
-        EganowCard(pan: EganowCard.samplePan, isLoading: true),
-      ),
+      ('while loading', EganowCard(pan: EganowCard.samplePan, isLoading: true)),
       (
         'while loading with the chase disabled',
         EganowCard(
@@ -806,6 +803,103 @@ void main() {
       // wins the arena outright.
       expect(find.text('CVV'), findsNothing);
       expect(balanceText(tester), 'GHS••••••');
+    });
+
+    testWidgets('is gone entirely when showBalance is false', (tester) async {
+      await pumpCard(
+        tester,
+        const EganowCard(
+          pan: EganowCard.samplePan,
+          balance: '1000',
+          currency: 'GHS',
+          showBalance: false,
+        ),
+      );
+      expect(balanceText(tester), '<none>');
+      expect(eye(), findsNothing);
+      expect(eyeOff(), findsNothing);
+    });
+
+    testWidgets('gives its corner back to the card\'s tap-to-flip', (
+      tester,
+    ) async {
+      await pumpCard(
+        tester,
+        const EganowCard(
+          pan: EganowCard.samplePan,
+          cvc: '418',
+          balance: '1000',
+          currency: 'GHS',
+          hideBalance: true,
+        ),
+      );
+      final corner = tester.getCenter(eyeOff());
+
+      await pumpCard(
+        tester,
+        const EganowCard(
+          pan: EganowCard.samplePan,
+          cvc: '418',
+          balance: '1000',
+          currency: 'GHS',
+          hideBalance: true,
+          showBalance: false,
+        ),
+      );
+      await tester.tapAt(corner);
+      await settle(tester);
+
+      // Flipping proves the row is gone from the tree rather than merely
+      // unpainted — anything left behind would swallow the tap.
+      expect(find.text('CVV'), findsOneWidget);
+    });
+
+    testWidgets('keeps its concealment across being taken away and put back', (
+      tester,
+    ) async {
+      late StateSetter setOuter;
+      var show = true;
+
+      tester.view.physicalSize = const Size(402, 900);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(tester.view.reset);
+
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: Center(
+              child: StatefulBuilder(
+                builder: (context, setState) {
+                  setOuter = setState;
+                  return SizedBox(
+                    width: 362,
+                    child: EganowCard(
+                      pan: EganowCard.samplePan,
+                      balance: '1000',
+                      currency: 'GHS',
+                      showBalance: show,
+                    ),
+                  );
+                },
+              ),
+            ),
+          ),
+        ),
+      );
+      await settle(tester);
+
+      await tester.tap(eye());
+      await settle(tester);
+      expect(balanceText(tester), 'GHS••••••');
+
+      setOuter(() => show = false);
+      await settle(tester);
+      expect(balanceText(tester), '<none>');
+
+      setOuter(() => show = true);
+      await settle(tester);
+      expect(balanceText(tester), 'GHS••••••');
+      expect(eyeOff(), findsOneWidget);
     });
   });
 

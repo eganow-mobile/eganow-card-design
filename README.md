@@ -28,6 +28,7 @@ EganowCard(
 | `isLoading` | You own this. While true the values stay concealed and shimmering, taps are ignored, and the contactless mark runs its chase. It never hides the mark — the mark is always drawn. |
 | `animateContactless` / `contactlessCycle` | Whether the mark animates while loading, and how long one sweep takes. |
 | `legalText` | The small print on the back. Empty string leaves it off. |
+| `showBalance` | Whether the balance is on the card at all. False takes the whole row away — figure, currency and eye. True (the default) changes nothing. |
 | `balance` | The formatted amount shown on the right of the front, with an eye beside it. Printed verbatim — grouping and rounding are yours. Null draws nothing. |
 | `currency` | The currency `balance` is in, e.g. `GHS`. Kept separate because it survives concealment. |
 | `hideBalance` | Whether the balance is concealed. Null (the default) lets the card own the eye; pass a value to drive it. Independent of `hideDetails` — see below. |
@@ -69,6 +70,12 @@ would.
 rides through concealment: a hidden balance reads `GHS••••••`, which still
 tells the holder which account they are looking at. Hiding a balance is about
 the figure, not about which currency you hold.
+
+`showBalance` draws the line somewhere else. `hideBalance` conceals the
+*figure*, leaving the row and its eye on the card; `showBalance: false` removes
+the *row* — nothing drawn, nothing to tap. A null `balance` gets you the same
+blank corner, so this is for the caller whose model always carries an amount
+and would rather not null the field to take the row off.
 
 **It has nothing to do with `hideDetails`.** A balance is worth covering in a
 room full of people while the card number is on show, and worth showing while
