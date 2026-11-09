@@ -142,6 +142,7 @@ class EganowCard extends StatefulWidget {
     this.controllers,
     this.onChanged,
     this.legalText = defaultLegalText,
+    this.showBalance = true,
     this.balance,
     this.currency,
     this.hideBalance,
@@ -182,6 +183,18 @@ class EganowCard extends StatefulWidget {
   /// Fired whenever an editable field changes.
   final void Function(EganowCardField field, String value)? onChanged;
 
+  /// Whether the balance is drawn at all.
+  ///
+  /// False takes the entire row away — the figure, the currency and the eye —
+  /// so there is nothing to read and nothing to tap. It answers a different
+  /// question from [hideBalance], which leaves the row and its eye on the card
+  /// and only conceals the figure.
+  ///
+  /// A null [balance] draws nothing either. This exists so a caller whose
+  /// model always carries an amount can take the row off the card without
+  /// having to null the field it reads from.
+  final bool showBalance;
+
   /// The balance amount shown on the front, already formatted — the card
   /// prints it verbatim, so grouping and rounding are the caller's.
   ///
@@ -199,6 +212,10 @@ class EganowCard extends StatefulWidget {
   final String? currency;
 
   /// Whether the balance is concealed.
+  ///
+  /// Concealment is about the figure alone: the row and its eye stay on the
+  /// card, reading `GHS••••••`. To take them away altogether, use
+  /// [showBalance].
   ///
   /// Leave null — the default — and the card owns the toggle: the eye flips it
   /// and the card rebuilds itself. Pass a value to drive it from outside, in
@@ -805,7 +822,8 @@ class _EganowCardState extends State<EganowCard> with TickerProviderStateMixin {
           ),
 
           // Balance, set against the right margin at the chip's own height.
-          if (widget.balance != null) _balanceSlot(m, shadows),
+          if (widget.showBalance && widget.balance != null)
+            _balanceSlot(m, shadows),
 
           // Card number.
           Positioned(
