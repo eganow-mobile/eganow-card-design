@@ -1020,4 +1020,149 @@ void main() {
     await settle(tester);
     expect(painted(), '5399  8402  1174  4821');
   });
+
+  group('the card number stays inside the card margins', () {
+    const pan = '5399  8402  1174  4821';
+    const masked = '••••  ••••  ••••  4821';
+
+    // A paragraph's own size is clamped to its constraints even when the
+    // glyphs paint beyond them, so measure the boxes the text really occupies.
+    double paintedRight(RenderBox renderer, InlineSpan text) {
+      final selection = TextSelection(
+        baseOffset: 0,
+        extentOffset: text.toPlainText().length,
+      );
+      final boxes = renderer is RenderEditable
+          ? renderer.getBoxesForSelection(selection)
+          : (renderer as RenderParagraph).getBoxesForSelection(selection);
+
+      return boxes
+          .map((b) => renderer.localToGlobal(Offset(b.right, 0)).dx)
+          .reduce((a, b) => a > b ? a : b);
+    }
+
+    RenderBox paragraphOf(WidgetTester tester, String text) =>
+        tester.renderObject<RenderParagraph>(find.text(text));
+
+    RenderBox editableOf(WidgetTester tester) =>
+        tester.allRenderObjects.whereType<RenderEditable>().single;
+
+    Future<void> pumpScaled(
+      WidgetTester tester,
+      EganowCard card, {
+      required double width,
+      required double scale,
+    }) async {
+      tester.view.physicalSize = const Size(800, 900);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(tester.view.reset);
+
+      // Tear the previous combination down so no state carries over.
+      await tester.pumpWidget(const SizedBox.shrink());
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Builder(
+            builder: (context) => MediaQuery(
+              data: MediaQuery.of(context)
+                  .copyWith(textScaler: TextScaler.linear(scale)),
+              child: Scaffold(
+                body: Align(
+                  alignment: Alignment.topLeft,
+                  child: SizedBox(width: width, child: card),
+                ),
+              ),
+            ),
+          ),
+        ),
+      );
+      await settle(tester);
+    }
+
+    void variant(
+      String name,
+      EganowCard Function() card,
+      RenderBox Function(WidgetTester tester) locate,
+    ) {
+      testWidgets(name, (tester) async {
+        for (final width in [200.0, 280.0, 320.0, 362.0]) {
+          for (final scale in [1.0, 1.3, 1.5, 2.0]) {
+            await pumpScaled(tester, card(), width: width, scale: scale);
+
+            final renderer = locate(tester);
+            final text = renderer is RenderEditable
+                ? renderer.text!
+                : (renderer as RenderParagraph).text;
+
+            // Trailing letter-spacing on the last glyph overshoots by < 0.2dp.
+            // The hint and the concealed fallback ellipsize instead of
+            // spilling, so their boxes stay in bounds while the number is cut.
+            if (renderer is RenderParagraph) {
+              expect(
+                renderer.didExceedMaxLines,
+                isFalse,
+                reason: '$name at ${width}dp, text scale $scale is truncated',
+              );
+            }
+            expect(
+              paintedRight(renderer, text),
+              lessThanOrEqualTo(width * 0.91 + 0.2),
+              reason: '$name at ${width}dp, text scale $scale',
+            );
+          }
+        }
+      });
+    }
+
+    variant(
+      'revealed',
+      () => const EganowCard(pan: pan),
+      (tester) => paragraphOf(tester, pan),
+    );
+
+    variant(
+      'masked',
+      () => const EganowCard(pan: pan, hideDetails: true),
+      (tester) => paragraphOf(tester, masked),
+    );
+
+    variant(
+      'a 19-digit number',
+      () => const EganowCard(pan: '5399  8402  1174  4821  123'),
+      (tester) => paragraphOf(tester, '5399  8402  1174  4821  123'),
+    );
+
+    variant(
+      'editable',
+      () => const EganowCard(pan: pan, editable: {EganowCardField.pan}),
+      editableOf,
+    );
+
+    variant(
+      'editable and masked',
+      () => const EganowCard(
+        pan: pan,
+        editable: {EganowCardField.pan},
+        hideDetails: true,
+      ),
+      editableOf,
+    );
+
+    // With no text the RenderEditable has nothing to measure; the hint is its
+    // own paragraph.
+    variant(
+      'editable with no value',
+      () => const EganowCard(editable: {EganowCardField.pan}),
+      (tester) => paragraphOf(tester, '••••  ••••  ••••  ••••'),
+    );
+
+    variant('editable with a caller-supplied controller, concealed', () {
+      final controller = TextEditingController(text: pan);
+      addTearDown(controller.dispose);
+      return EganowCard(
+        controllers: {EganowCardField.pan: controller},
+        editable: const {EganowCardField.pan},
+        hideDetails: true,
+      );
+    }, (tester) => paragraphOf(tester, masked));
+  });
 }

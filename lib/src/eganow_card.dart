@@ -915,7 +915,11 @@ class _EganowCardState extends State<EganowCard> with TickerProviderStateMixin {
     );
   }
 
-  Widget _panSlot(EganowCardMetrics m, List<Shadow> shadows) {
+  // Unscaled so what [_fittedPanStyle] measures is what gets painted.
+  Widget _panSlot(EganowCardMetrics m, List<Shadow> shadows) =>
+      MediaQuery.withNoTextScaling(child: _panContent(m, shadows));
+
+  Widget _panContent(EganowCardMetrics m, List<Shadow> shadows) {
     final style = _fittedPanStyle(m, shadows);
 
     if (_isEditable(EganowCardField.pan)) {
