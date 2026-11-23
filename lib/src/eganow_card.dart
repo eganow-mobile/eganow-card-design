@@ -57,16 +57,6 @@ enum EganowCardNetwork {
   };
 }
 
-/// What the security code is called on this card. It is the same three digits
-/// either way — issuers and networks simply differ on what they print, so the
-/// label follows the card being represented rather than the code itself.
-enum EganowSecurityCodeLabel {
-  cvv,
-  cvc;
-
-  String get label => name.toUpperCase();
-}
-
 /// The four data slots on the card. Pass any of these in [EganowCard.editable]
 /// to turn that slot into a live text field on the artwork itself.
 enum EganowCardField { pan, holder, expiry, cvc }
@@ -161,7 +151,6 @@ class EganowCard extends StatefulWidget {
     this.onBalanceVisibilityChanged,
     this.medium,
     this.network,
-    this.securityCodeLabel,
     this.hideDetails = false,
     this.isLoading = false,
     this.animateContactless = true,
@@ -255,21 +244,14 @@ class EganowCard extends StatefulWidget {
   /// only draw the eye.
   final EganowCardMedium? medium;
 
-  /// Draws the Visa or Mastercard logo bottom right on the front.
+  /// Draws the Visa or Mastercard logo bottom right on the front, and decides
+  /// how the security code is captioned: CVC for Mastercard, CVV otherwise.
   ///
-  /// Left null — the default — nothing is drawn there, not even a placeholder.
+  /// Left null — the default — no logo is drawn, not even a placeholder, and
+  /// the code is captioned CVV.
   /// Like [medium] it is deliberately not concealed by [hideDetails]: which
   /// network issued a card isn't a secret.
   final EganowCardNetwork? network;
-
-  /// Whether the security code is captioned CVV or CVC — on the back of the
-  /// card and, in form mode, on the field below it. Only the caption changes;
-  /// the slot is [EganowCardField.cvc] whichever name is shown.
-  ///
-  /// Left null — the default — the caption follows [network]: CVV for Visa,
-  /// CVC for Mastercard, and CVV when there is no network either. An explicit
-  /// value always wins.
-  final EganowSecurityCodeLabel? securityCodeLabel;
 
   /// Conceals the card's data: the PAN keeps only its last four digits, and
   /// the holder, expiry, CVC and signature are blurred out. An editable field
@@ -518,12 +500,10 @@ class _EganowCardState extends State<EganowCard> with TickerProviderStateMixin {
     }
   }
 
-  EganowSecurityCodeLabel get _securityCodeLabel =>
-      widget.securityCodeLabel ??
-      switch (widget.network) {
-        EganowCardNetwork.mastercard => EganowSecurityCodeLabel.cvc,
-        EganowCardNetwork.visa || null => EganowSecurityCodeLabel.cvv,
-      };
+  String get _securityCodeLabel => switch (widget.network) {
+    EganowCardNetwork.mastercard => 'CVC',
+    EganowCardNetwork.visa || null => 'CVV',
+  };
 
   void _onFocusChanged(EganowCardField field, FocusNode node) {
     if (!node.hasFocus) {
@@ -751,7 +731,7 @@ class _EganowCardState extends State<EganowCard> with TickerProviderStateMixin {
     EganowCardField.pan => 'Card number',
     EganowCardField.holder => 'Name on card',
     EganowCardField.expiry => 'Expiry',
-    EganowCardField.cvc => _securityCodeLabel.label,
+    EganowCardField.cvc => _securityCodeLabel,
   };
 
   static String _formHint(EganowCardField field) => switch (field) {
@@ -1031,9 +1011,9 @@ class _EganowCardState extends State<EganowCard> with TickerProviderStateMixin {
     final value = _valueOf(EganowCardField.holder).trim();
     final style = EganowFonts.urbanist(
       color: Colors.white,
-      fontSize: m.cqw(3.7),
+      fontSize: m.cqw(3.1),
       fontWeight: FontWeight.w700,
-      letterSpacing: m.cqw(0.12),
+      letterSpacing: m.cqw(0.10),
       shadows: shadows,
     );
 
@@ -1076,10 +1056,10 @@ class _EganowCardState extends State<EganowCard> with TickerProviderStateMixin {
 
   Widget _networkLogo(EganowCardMetrics m, EganowCardNetwork network) {
     final (asset, height, aspect) = switch (network) {
-      EganowCardNetwork.visa => ('assets/images/visa.svg', m.cqw(4.2), 81 / 27),
+      EganowCardNetwork.visa => ('assets/images/visa.svg', m.cqw(3.4), 81 / 27),
       EganowCardNetwork.mastercard => (
         'assets/images/mastercard.svg',
-        m.cqw(6.5),
+        m.cqw(5.2),
         72 / 56,
       ),
     };
@@ -1093,10 +1073,10 @@ class _EganowCardState extends State<EganowCard> with TickerProviderStateMixin {
         child: DecoratedBox(
           decoration: BoxDecoration(
             color: Colors.white,
-            borderRadius: BorderRadius.circular(m.cqw(1.4)),
+            borderRadius: BorderRadius.circular(m.cqw(1.1)),
           ),
           child: Padding(
-            padding: EdgeInsets.all(m.cqw(1)),
+            padding: EdgeInsets.all(m.cqw(0.8)),
             child: SizedBox(
               width: height * aspect,
               height: height,
@@ -1203,7 +1183,7 @@ class _EganowCardState extends State<EganowCard> with TickerProviderStateMixin {
             Positioned(
               left: w * 0.67,
               top: h * 0.505,
-              child: Text(_securityCodeLabel.label, style: caption),
+              child: Text(_securityCodeLabel, style: caption),
             ),
 
             // Unscaled, like the legal text below, so the two can't meet.

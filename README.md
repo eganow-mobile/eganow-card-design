@@ -34,8 +34,7 @@ EganowCard(
 | `hideBalance` | Whether the balance is concealed. Null (the default) lets the card own the eye; pass a value to drive it. Independent of `hideDetails` — see below. |
 | `onBalanceVisibilityChanged` | Fires with the concealment state being asked for when the eye is tapped, driven or not. |
 | `medium` | Badges the front `Virtual` or `Physical`, top left. Null (the default) draws no badge. Not concealed by `hideDetails` — which medium a card is isn't a secret. |
-| `network` | Draws the Visa or Mastercard logo bottom right on the front, in the spot the expiry used to occupy. Null (the default) draws nothing. Not concealed by `hideDetails`. |
-| `securityCodeLabel` | Captions the security code `CVV` or `CVC`, on the back and on the form field. Null (the default) follows `network` — CVV for Visa, CVC for Mastercard, CVV with neither. An explicit value wins. Only the caption — the slot stays `EganowCardField.cvc`. |
+| `network` | Draws the Visa or Mastercard logo bottom right on the front, in the spot the expiry used to occupy. Also captions the security code on the back and on the form field: `CVC` for Mastercard, `CVV` for Visa or no network. Null (the default) draws no logo. Not concealed by `hideDetails`. |
 | `flipped` | Leave null to let the card manage its own flip; pass a value to drive it. |
 | `width` | Fills its parent when null. |
 

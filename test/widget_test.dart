@@ -1314,10 +1314,10 @@ void main() {
               ),
             );
             final (height, aspect) = switch (network) {
-              EganowCardNetwork.visa => (4.2, 81 / 27),
-              EganowCardNetwork.mastercard => (6.5, 72 / 56),
+              EganowCardNetwork.visa => (3.4, 81 / 27),
+              EganowCardNetwork.mastercard => (5.2, 72 / 56),
             };
-            const pad = 362 * 0.01;
+            const pad = 362 * 0.008;
             expect(pill.height, closeTo(362 * height / 100 + 2 * pad, 0.01));
             expect(
               pill.width,
@@ -1352,41 +1352,9 @@ void main() {
       });
     }
 
-    testWidgets('an explicit label beats the network', (tester) async {
-      await pumpCard(
-        tester,
-        const EganowCard(
-          cvc: '418',
-          flipped: true,
-          network: EganowCardNetwork.visa,
-          securityCodeLabel: EganowSecurityCodeLabel.cvc,
-        ),
-      );
-
-      expect(find.text('CVC'), findsOneWidget);
-      expect(find.text('CVV'), findsNothing);
-    });
-
-    testWidgets(
-      'is CVV with no label and no network, on the back and in the form',
-      (tester) async {
-        await pumpCard(
-          tester,
-          const EganowCard(
-            cvc: '418',
-            editable: {EganowCardField.cvc},
-            entry: EganowCardEntry.form,
-            flipped: true,
-          ),
-        );
-
-        // Once on the artwork, once as the form field's label.
-        expect(find.text('CVV'), findsNWidgets(2));
-        expect(find.text('CVC'), findsNothing);
-      },
-    );
-
-    testWidgets('follows securityCodeLabel', (tester) async {
+    testWidgets('is CVV with no network, on the back and in the form', (
+      tester,
+    ) async {
       await pumpCard(
         tester,
         const EganowCard(
@@ -1394,12 +1362,12 @@ void main() {
           editable: {EganowCardField.cvc},
           entry: EganowCardEntry.form,
           flipped: true,
-          securityCodeLabel: EganowSecurityCodeLabel.cvc,
         ),
       );
 
-      expect(find.text('CVC'), findsNWidgets(2));
-      expect(find.text('CVV'), findsNothing);
+      // Once on the artwork, once as the form field's label.
+      expect(find.text('CVV'), findsNWidgets(2));
+      expect(find.text('CVC'), findsNothing);
     });
   });
 
