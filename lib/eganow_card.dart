@@ -9,8 +9,8 @@ export 'src/eganow_card.dart'
         EganowCardField,
         EganowCardMedium,
         EganowCardMetrics,
+        EganowCardNetwork,
         EganowCardTier,
-        EganowCardTierArt,
-        EganowSecurityCodeLabel;
+        EganowCardTierArt;
 export 'src/card_input_formatters.dart' show groupPan, maskPan;
 export 'src/eganow_tokens.dart' show EganowColors, EganowMotion;
