@@ -2,6 +2,7 @@ import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter_svg/flutter_svg.dart';
 
 import 'card_input_formatters.dart';
 import 'css_gradients.dart';
@@ -869,7 +870,7 @@ class _EganowCardState extends State<EganowCard> with TickerProviderStateMixin {
             right: w * 0.09,
             bottom: h * 0.075,
             child: Row(
-              crossAxisAlignment: CrossAxisAlignment.end,
+              crossAxisAlignment: CrossAxisAlignment.center,
               children: [
                 Expanded(child: _holderSlot(m, shadows)),
                 if (widget.network != null) ...[
@@ -1074,34 +1075,35 @@ class _EganowCardState extends State<EganowCard> with TickerProviderStateMixin {
   }
 
   Widget _networkLogo(EganowCardMetrics m, EganowCardNetwork network) {
-    final visa = TextPainter(
-      text: TextSpan(
-        text: 'VISA',
-        style: EganowFonts.urbanist(
-          color: Colors.white,
-          fontSize: m.cqw(5.2),
-          fontWeight: FontWeight.w800,
-          fontStyle: FontStyle.italic,
-          letterSpacing: m.cqw(0.1),
-        ),
-      ),
-      textDirection: TextDirection.ltr,
-      maxLines: 1,
-    )..layout();
-
-    final (size, painter) = switch (network) {
-      EganowCardNetwork.visa => (visa.size, _VisaPainter(visa)),
+    final (asset, height, aspect) = switch (network) {
+      EganowCardNetwork.visa => ('assets/images/visa.svg', m.cqw(4.2), 81 / 27),
       EganowCardNetwork.mastercard => (
-        Size(m.cqw(11), m.cqw(6.8)),
-        const _MastercardPainter(),
+        'assets/images/mastercard.svg',
+        m.cqw(6.5),
+        72 / 56,
       ),
     };
 
+    // Both marks carry dark ink (Visa's blue, Mastercard's black wordmark) that
+    // disappears on the card faces, so they sit on a white pill.
     return Semantics(
       label: network.label,
       image: true,
       child: ExcludeSemantics(
-        child: CustomPaint(size: size, painter: painter),
+        child: DecoratedBox(
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(m.cqw(1.4)),
+          ),
+          child: Padding(
+            padding: EdgeInsets.all(m.cqw(1)),
+            child: SizedBox(
+              width: height * aspect,
+              height: height,
+              child: SvgPicture.asset(asset, package: EganowCard.assetPackage),
+            ),
+          ),
+        ),
       ),
     );
   }
@@ -1715,42 +1717,6 @@ Gradient _signatureWeave(EganowCardMetrics metrics) {
     stops: const [0.0, 0.5, 0.5, 1.0],
     tileMode: TileMode.repeated,
   );
-}
-
-class _MastercardPainter extends CustomPainter {
-  const _MastercardPainter();
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    final r = size.height / 2;
-    final left = Offset(r, r);
-    final right = Offset(size.width - r, r);
-
-    canvas.drawCircle(left, r, Paint()..color = const Color(0xFFEB001B));
-    canvas.drawCircle(right, r, Paint()..color = const Color(0xFFF79E1B));
-
-    final lens = Path.combine(
-      PathOperation.intersect,
-      Path()..addOval(Rect.fromCircle(center: left, radius: r)),
-      Path()..addOval(Rect.fromCircle(center: right, radius: r)),
-    );
-    canvas.drawPath(lens, Paint()..color = const Color(0xFFFF5F00));
-  }
-
-  @override
-  bool shouldRepaint(_MastercardPainter old) => false;
-}
-
-class _VisaPainter extends CustomPainter {
-  const _VisaPainter(this.text);
-
-  final TextPainter text;
-
-  @override
-  void paint(Canvas canvas, Size size) => text.paint(canvas, Offset.zero);
-
-  @override
-  bool shouldRepaint(_VisaPainter old) => old.text.text != text.text;
 }
 
 /// Backs an editable field. [display] is applied whenever the field paints

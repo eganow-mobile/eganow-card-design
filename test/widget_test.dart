@@ -1,6 +1,10 @@
+import 'dart:async';
+import 'dart:typed_data';
+
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart' show rootBundle;
+import 'package:flutter/services.dart' show CachingAssetBundle, rootBundle;
 import 'package:flutter/rendering.dart';
+import 'package:flutter_svg/flutter_svg.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import 'package:eganow_card/eganow_card.dart';
@@ -1156,6 +1160,72 @@ void main() {
       });
     }
 
+    for (final (network, asset) in [
+      (EganowCardNetwork.visa, 'assets/images/visa.svg'),
+      (EganowCardNetwork.mastercard, 'assets/images/mastercard.svg'),
+    ]) {
+      testWidgets('${network.name} loads $asset from the package', (
+        tester,
+      ) async {
+        await pumpCard(
+          tester,
+          EganowCard(pan: EganowCard.samplePan, network: network),
+        );
+        final loader =
+            tester.widget<SvgPicture>(find.byType(SvgPicture)).bytesLoader
+                as SvgAssetLoader;
+        expect(loader.assetName, asset);
+        expect(loader.packageName, EganowCard.assetPackage);
+      });
+    }
+
+    for (final network in EganowCardNetwork.values) {
+      for (final (name, card) in <(String, EganowCard Function())>[
+        ('a holder', () => EganowCard(holder: 'Alex Tantuo', network: network)),
+        ('no holder', () => EganowCard(network: network)),
+        (
+          'concealed',
+          () => EganowCard(
+            holder: 'Alex Tantuo',
+            network: network,
+            hideDetails: true,
+          ),
+        ),
+        (
+          'an editable holder',
+          () => EganowCard(
+            network: network,
+            editable: const {EganowCardField.holder},
+          ),
+        ),
+      ]) {
+        testWidgets('${network.name} is centred on the holder with $name', (
+          tester,
+        ) async {
+          await pumpCard(tester, card());
+          double centre(RenderBox b) =>
+              b.localToGlobal(b.size.center(Offset.zero)).dy;
+          final holderBox = find
+              .descendant(
+                of: find.byType(EganowCard),
+                matching: find.byWidgetPredicate(
+                  (w) => w is Text || w is EditableText,
+                ),
+              )
+              .evaluate()
+              .map((e) => e.renderObject! as RenderBox)
+              .reduce((a, b) => centre(a) > centre(b) ? a : b);
+          final logoBox = tester.renderObject<RenderBox>(
+            find.descendant(
+              of: logo(network.label),
+              matching: find.byType(DecoratedBox),
+            ),
+          );
+          expect(centre(logoBox), closeTo(centre(holderBox), 0.5));
+        });
+      }
+    }
+
     testWidgets('is not concealed by hideDetails', (tester) async {
       await pumpCard(
         tester,
@@ -1168,34 +1238,95 @@ void main() {
       expect(logo('Mastercard'), findsOneWidget);
     });
 
-    testWidgets('does not overflow narrow cards at large text scale', (
-      tester,
-    ) async {
-      tester.view.physicalSize = const Size(402, 900);
-      tester.view.devicePixelRatio = 1.0;
-      addTearDown(tester.view.reset);
+    for (final network in EganowCardNetwork.values) {
+      testWidgets(
+        'does not overflow narrow cards at large text scale: ${network.name}',
+        (tester) async {
+          tester.view.physicalSize = const Size(402, 900);
+          tester.view.devicePixelRatio = 1.0;
+          addTearDown(tester.view.reset);
 
-      await tester.pumpWidget(
-        MaterialApp(
-          home: MediaQuery(
-            data: const MediaQueryData(textScaler: TextScaler.linear(2)),
-            child: Scaffold(
-              body: Center(
-                child: SizedBox(
-                  width: 200,
-                  child: EganowCard(
-                    holder: 'Alexandra Tantuo-Mensah',
-                    network: EganowCardNetwork.visa,
+          await tester.pumpWidget(
+            MaterialApp(
+              home: MediaQuery(
+                data: const MediaQueryData(textScaler: TextScaler.linear(2)),
+                child: Scaffold(
+                  body: Center(
+                    child: SizedBox(
+                      width: 200,
+                      child: EganowCard(
+                        holder: 'Alexandra Tantuo-Mensah',
+                        network: network,
+                      ),
+                    ),
                   ),
                 ),
               ),
             ),
-          ),
-        ),
+          );
+          await settle(tester);
+          await tester.runAsync(
+            () => Future<void>.delayed(const Duration(milliseconds: 200)),
+          );
+          await tester.pump();
+          expect(tester.takeException(), isNull);
+        },
       );
-      await settle(tester);
-      expect(tester.takeException(), isNull);
-    });
+
+      for (final stalled in [true, false]) {
+        testWidgets(
+          '${network.name} is final-size ${stalled ? 'before' : 'after'} '
+          'the SVG loads',
+          (tester) async {
+            tester.view.physicalSize = const Size(402, 900);
+            tester.view.devicePixelRatio = 1.0;
+            addTearDown(tester.view.reset);
+            await tester.pumpWidget(
+              DefaultAssetBundle(
+                bundle: stalled ? _StalledBundle() : rootBundle,
+                child: MaterialApp(
+                  home: Scaffold(
+                    body: Center(
+                      child: SizedBox(
+                        width: 362,
+                        child: EganowCard(
+                          holder: 'Alex Tantuo',
+                          network: network,
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            );
+            if (!stalled) {
+              await tester.runAsync(
+                () => Future<void>.delayed(const Duration(milliseconds: 200)),
+              );
+              await tester.pump();
+              await tester.pump();
+            }
+
+            final pill = tester.getSize(
+              find.descendant(
+                of: find.bySemanticsLabel(network.label),
+                matching: find.byType(DecoratedBox),
+              ),
+            );
+            final (height, aspect) = switch (network) {
+              EganowCardNetwork.visa => (4.2, 81 / 27),
+              EganowCardNetwork.mastercard => (6.5, 72 / 56),
+            };
+            const pad = 362 * 0.01;
+            expect(pill.height, closeTo(362 * height / 100 + 2 * pad, 0.01));
+            expect(
+              pill.width,
+              closeTo(362 * height / 100 * aspect + 2 * pad, 0.01),
+            );
+          },
+        );
+      }
+    }
   });
 
   group('the security code caption', () {
@@ -1449,4 +1580,9 @@ void main() {
       );
     }, (tester) => paragraphOf(tester, masked));
   });
+}
+
+class _StalledBundle extends CachingAssetBundle {
+  @override
+  Future<ByteData> load(String key) => Completer<ByteData>().future;
 }

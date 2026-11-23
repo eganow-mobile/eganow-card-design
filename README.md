@@ -136,9 +136,14 @@ nothing about the mark.
   host project, change it in both places or the artwork will not load.
 - **Fonts are bundled, not fetched.** Urbanist and Roboto Mono ship in
   [`assets/fonts/`](assets/fonts) and are declared in `pubspec.yaml`, so the
-  card's metrics hold offline and the package has no third-party dependency.
+  card's metrics hold offline.
   Only the weights the card paints are included (400/500/600/700, plus
   Urbanist italic at 400 and 600) — reach for them through `EganowFonts`
   rather than naming the families by hand, so the `package:` prefix that
   resolves them stays in one place. Both are SIL Open Font Licensed; the
   licences sit beside the faces.
+- **Network logos are SVGs.** `assets/images/visa.svg` and
+  `assets/images/mastercard.svg` are rendered with `flutter_svg`, the package's
+  one third-party dependency, and are declared through the `assets/images/`
+  directory entry in `pubspec.yaml`. Each sits on a white pill because the
+  marks are dark and would vanish on the card faces.
