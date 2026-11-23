@@ -9,6 +9,7 @@ export 'src/eganow_card.dart'
         EganowCardField,
         EganowCardMedium,
         EganowCardMetrics,
+        EganowCardNetwork,
         EganowCardTier,
         EganowCardTierArt,
         EganowSecurityCodeLabel;
