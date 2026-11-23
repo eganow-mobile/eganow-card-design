@@ -2,6 +2,7 @@ import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter_svg/flutter_svg.dart';
 
 import 'card_input_formatters.dart';
 import 'css_gradients.dart';
@@ -45,14 +46,15 @@ enum EganowCardMedium {
   String get label => '${name[0].toUpperCase()}${name.substring(1)}';
 }
 
-/// What the security code is called on this card. It is the same three digits
-/// either way — issuers and networks simply differ on what they print, so the
-/// label follows the card being represented rather than the code itself.
-enum EganowSecurityCodeLabel {
-  cvv,
-  cvc;
+/// The payment network whose logo is drawn bottom right on the front.
+enum EganowCardNetwork {
+  visa,
+  mastercard;
 
-  String get label => name.toUpperCase();
+  String get label => switch (this) {
+    EganowCardNetwork.visa => 'Visa',
+    EganowCardNetwork.mastercard => 'Mastercard',
+  };
 }
 
 /// The four data slots on the card. Pass any of these in [EganowCard.editable]
@@ -148,7 +150,7 @@ class EganowCard extends StatefulWidget {
     this.hideBalance,
     this.onBalanceVisibilityChanged,
     this.medium,
-    this.securityCodeLabel = EganowSecurityCodeLabel.cvv,
+    this.network,
     this.hideDetails = false,
     this.isLoading = false,
     this.animateContactless = true,
@@ -242,10 +244,14 @@ class EganowCard extends StatefulWidget {
   /// only draw the eye.
   final EganowCardMedium? medium;
 
-  /// Whether the security code is captioned CVV or CVC — on the back of the
-  /// card and, in form mode, on the field below it. Only the caption changes;
-  /// the slot is [EganowCardField.cvc] whichever name is shown.
-  final EganowSecurityCodeLabel securityCodeLabel;
+  /// Draws the Visa or Mastercard logo bottom right on the front, and decides
+  /// how the security code is captioned: CVC for Mastercard, CVV otherwise.
+  ///
+  /// Left null — the default — no logo is drawn, not even a placeholder, and
+  /// the code is captioned CVV.
+  /// Like [medium] it is deliberately not concealed by [hideDetails]: which
+  /// network issued a card isn't a secret.
+  final EganowCardNetwork? network;
 
   /// Conceals the card's data: the PAN keeps only its last four digits, and
   /// the holder, expiry, CVC and signature are blurred out. An editable field
@@ -456,7 +462,6 @@ class _EganowCardState extends State<EganowCard> with TickerProviderStateMixin {
     required EganowCardMetrics metrics,
     required TextStyle style,
     required Widget Function() input,
-    bool alignEnd = false,
   }) {
     final controller = _controllerFor(field);
     final hidden = _isHidden(field);
@@ -468,7 +473,7 @@ class _EganowCardState extends State<EganowCard> with TickerProviderStateMixin {
     if (!hidden) return input();
 
     return Align(
-      alignment: alignEnd ? Alignment.centerRight : Alignment.centerLeft,
+      alignment: Alignment.centerLeft,
       child: Padding(
         padding: EdgeInsets.symmetric(vertical: metrics.cqw(0.4)),
         child: Text(
@@ -495,15 +500,22 @@ class _EganowCardState extends State<EganowCard> with TickerProviderStateMixin {
     }
   }
 
+  String get _securityCodeLabel => switch (widget.network) {
+    EganowCardNetwork.mastercard => 'CVC',
+    EganowCardNetwork.visa || null => 'CVV',
+  };
+
   void _onFocusChanged(EganowCardField field, FocusNode node) {
     if (!node.hasFocus) {
       setState(() {}); // repaint the underline and re-hide the value
       return;
     }
     setState(() {
-      // The CVC lives on the back, so focusing it turns the card over.
+      // The expiry and CVC live on the back, so focusing either turns the
+      // card over.
       if (_selfManaged) {
-        _selfFlipped = field == EganowCardField.cvc;
+        _selfFlipped =
+            field == EganowCardField.cvc || field == EganowCardField.expiry;
       }
     });
   }
@@ -719,7 +731,7 @@ class _EganowCardState extends State<EganowCard> with TickerProviderStateMixin {
     EganowCardField.pan => 'Card number',
     EganowCardField.holder => 'Name on card',
     EganowCardField.expiry => 'Expiry',
-    EganowCardField.cvc => widget.securityCodeLabel.label,
+    EganowCardField.cvc => _securityCodeLabel,
   };
 
   static String _formHint(EganowCardField field) => switch (field) {
@@ -833,21 +845,18 @@ class _EganowCardState extends State<EganowCard> with TickerProviderStateMixin {
             child: _revealWrap(_panSlot(m, shadows)),
           ),
 
-          // Card holder and expiry.
           Positioned(
             left: w * 0.09,
             right: w * 0.09,
             bottom: h * 0.075,
             child: Row(
-              crossAxisAlignment: CrossAxisAlignment.end,
+              crossAxisAlignment: CrossAxisAlignment.center,
               children: [
                 Expanded(child: _holderSlot(m, shadows)),
-                SizedBox(width: m.cqw(4)),
-                SizedBox(
-                  // 20% of the row, which is itself 82% of the card.
-                  width: w * 0.82 * 0.20,
-                  child: _expirySlot(m, shadows),
-                ),
+                if (widget.network != null) ...[
+                  SizedBox(width: m.cqw(4)),
+                  _networkLogo(m, widget.network!),
+                ],
               ],
             ),
           ),
@@ -1002,9 +1011,9 @@ class _EganowCardState extends State<EganowCard> with TickerProviderStateMixin {
     final value = _valueOf(EganowCardField.holder).trim();
     final style = EganowFonts.urbanist(
       color: Colors.white,
-      fontSize: m.cqw(3.7),
+      fontSize: m.cqw(3.1),
       fontWeight: FontWeight.w700,
-      letterSpacing: m.cqw(0.12),
+      letterSpacing: m.cqw(0.10),
       shadows: shadows,
     );
 
@@ -1042,61 +1051,40 @@ class _EganowCardState extends State<EganowCard> with TickerProviderStateMixin {
       );
     }
 
-    return _LabelledSlot(
-      metrics: m,
-      label: 'Card holder',
-      child: _revealWrap(field),
-    );
+    return _revealWrap(field);
   }
 
-  Widget _expirySlot(EganowCardMetrics m, List<Shadow> shadows) {
-    final value = _valueOf(EganowCardField.expiry).trim();
-    final style = EganowFonts.urbanist(
-      color: Colors.white,
-      fontSize: m.cqw(3.7),
-      fontWeight: FontWeight.w700,
-      letterSpacing: m.cqw(0.12),
-      shadows: shadows,
-    );
+  Widget _networkLogo(EganowCardMetrics m, EganowCardNetwork network) {
+    final (asset, height, aspect) = switch (network) {
+      EganowCardNetwork.visa => ('assets/images/visa.svg', m.cqw(3.4), 81 / 27),
+      EganowCardNetwork.mastercard => (
+        'assets/images/mastercard.svg',
+        m.cqw(5.2),
+        72 / 56,
+      ),
+    };
 
-    final hidden = _isHidden(EganowCardField.expiry);
-    final Widget field;
-    if (_isEditable(EganowCardField.expiry)) {
-      field = _maskAware(
-        field: EganowCardField.expiry,
-        metrics: m,
-        style: style,
-        alignEnd: true,
-        input: () => _OnCardInput(
-          metrics: m,
-          controller: _controllerFor(EganowCardField.expiry)!,
-          focusNode: _focus[EganowCardField.expiry]!,
-          formatters: expiryFormatters,
-          keyboardType: TextInputType.number,
-          style: style,
-          hint: 'MM/YY',
-          alignEnd: true,
-          onChanged: (v) => _emit(EganowCardField.expiry, v),
+    // Both marks carry dark ink (Visa's blue, Mastercard's black wordmark) that
+    // disappears on the card faces, so they sit on a white pill.
+    return Semantics(
+      label: network.label,
+      image: true,
+      child: ExcludeSemantics(
+        child: DecoratedBox(
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(m.cqw(1.1)),
+          ),
+          child: Padding(
+            padding: EdgeInsets.all(m.cqw(0.8)),
+            child: SizedBox(
+              width: height * aspect,
+              height: height,
+              child: SvgPicture.asset(asset, package: EganowCard.assetPackage),
+            ),
+          ),
         ),
-      );
-    } else {
-      field = Opacity(
-        opacity: (value.isEmpty && !hidden) ? 0.34 : 1,
-        child: Text(
-          hidden ? _concealedExpiry : (value.isEmpty ? 'MM/YY' : value),
-          maxLines: 1,
-          softWrap: false,
-          textAlign: TextAlign.right,
-          style: style,
-        ),
-      );
-    }
-
-    return _LabelledSlot(
-      metrics: m,
-      label: 'Expiry',
-      alignEnd: true,
-      child: _revealWrap(field),
+      ),
     );
   }
 
@@ -1105,6 +1093,12 @@ class _EganowCardState extends State<EganowCard> with TickerProviderStateMixin {
   Widget _buildBack(EganowCardMetrics m) {
     final w = m.width;
     final h = m.height;
+    final caption = EganowFonts.urbanist(
+      color: Colors.white.withValues(alpha: 0.75),
+      fontSize: m.cqw(2.3),
+      fontWeight: FontWeight.w700,
+      letterSpacing: m.cqw(0.4),
+    );
 
     return DecoratedBox(
       decoration: BoxDecoration(
@@ -1189,13 +1183,22 @@ class _EganowCardState extends State<EganowCard> with TickerProviderStateMixin {
             Positioned(
               left: w * 0.67,
               top: h * 0.505,
-              child: Text(
-                widget.securityCodeLabel.label,
-                style: EganowFonts.urbanist(
-                  color: Colors.white.withValues(alpha: 0.75),
-                  fontSize: m.cqw(2.3),
-                  fontWeight: FontWeight.w700,
-                  letterSpacing: m.cqw(0.4),
+              child: Text(_securityCodeLabel, style: caption),
+            ),
+
+            // Unscaled, like the legal text below, so the two can't meet.
+            Positioned(
+              left: w * 0.06,
+              top: h * 0.505,
+              width: w * 0.3,
+              child: MediaQuery.withNoTextScaling(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text('EXPIRY', style: caption),
+                    SizedBox(height: m.cqw(0.8)),
+                    _expirySlot(m),
+                  ],
                 ),
               ),
             ),
@@ -1222,13 +1225,15 @@ class _EganowCardState extends State<EganowCard> with TickerProviderStateMixin {
                 left: w * 0.06,
                 right: w * 0.06,
                 bottom: h * 0.05,
-                child: Text(
-                  widget.legalText,
-                  style: EganowFonts.urbanist(
-                    color: Colors.white.withValues(alpha: 0.45),
-                    fontSize: m.cqw(2.15),
-                    fontWeight: FontWeight.w500,
-                    height: 1.45,
+                child: MediaQuery.withNoTextScaling(
+                  child: Text(
+                    widget.legalText,
+                    style: EganowFonts.urbanist(
+                      color: Colors.white.withValues(alpha: 0.45),
+                      fontSize: m.cqw(2.15),
+                      fontWeight: FontWeight.w500,
+                      height: 1.45,
+                    ),
                   ),
                 ),
               ),
@@ -1236,6 +1241,48 @@ class _EganowCardState extends State<EganowCard> with TickerProviderStateMixin {
         ),
       ),
     );
+  }
+
+  Widget _expirySlot(EganowCardMetrics m) {
+    final value = _valueOf(EganowCardField.expiry).trim();
+    final style = EganowFonts.urbanist(
+      color: Colors.white,
+      fontSize: m.cqw(3.7),
+      fontWeight: FontWeight.w700,
+      letterSpacing: m.cqw(0.12),
+    );
+
+    final hidden = _isHidden(EganowCardField.expiry);
+    final Widget field;
+    if (_isEditable(EganowCardField.expiry)) {
+      field = _maskAware(
+        field: EganowCardField.expiry,
+        metrics: m,
+        style: style,
+        input: () => _OnCardInput(
+          metrics: m,
+          controller: _controllerFor(EganowCardField.expiry)!,
+          focusNode: _focus[EganowCardField.expiry]!,
+          formatters: expiryFormatters,
+          keyboardType: TextInputType.number,
+          style: style,
+          hint: 'MM/YY',
+          onChanged: (v) => _emit(EganowCardField.expiry, v),
+        ),
+      );
+    } else {
+      field = Opacity(
+        opacity: (value.isEmpty && !hidden) ? 0.34 : 1,
+        child: Text(
+          hidden ? _concealedExpiry : (value.isEmpty ? 'MM/YY' : value),
+          maxLines: 1,
+          softWrap: false,
+          style: style,
+        ),
+      );
+    }
+
+    return _revealWrap(field);
   }
 
   Widget _cvcSlot(EganowCardMetrics m) {
@@ -1300,45 +1347,6 @@ class _EganowCardState extends State<EganowCard> with TickerProviderStateMixin {
   }
 }
 
-/// The uppercase label stacked above a value on the card face.
-class _LabelledSlot extends StatelessWidget {
-  const _LabelledSlot({
-    required this.metrics,
-    required this.label,
-    required this.child,
-    this.alignEnd = false,
-  });
-
-  final EganowCardMetrics metrics;
-  final String label;
-  final Widget child;
-  final bool alignEnd;
-
-  @override
-  Widget build(BuildContext context) {
-    return Column(
-      mainAxisSize: MainAxisSize.min,
-      crossAxisAlignment: alignEnd
-          ? CrossAxisAlignment.end
-          : CrossAxisAlignment.start,
-      children: [
-        Text(
-          label.toUpperCase(),
-          maxLines: 1,
-          style: EganowFonts.urbanist(
-            color: Colors.white.withValues(alpha: 0.72),
-            fontSize: metrics.cqw(2.4),
-            fontWeight: FontWeight.w600,
-            letterSpacing: metrics.cqw(0.35),
-          ),
-        ),
-        SizedBox(height: metrics.cqw(0.7)),
-        child,
-      ],
-    );
-  }
-}
-
 /// A text field sitting directly on the artwork. It carries no rule at rest —
 /// the card reads exactly as printed — and takes a solid white underline only
 /// while it holds focus.
@@ -1352,7 +1360,6 @@ class _OnCardInput extends StatelessWidget {
     required this.hint,
     this.keyboardType,
     this.textCapitalization = TextCapitalization.none,
-    this.alignEnd = false,
     this.underline = true,
     this.onChanged,
   });
@@ -1365,7 +1372,6 @@ class _OnCardInput extends StatelessWidget {
   final String hint;
   final TextInputType? keyboardType;
   final TextCapitalization textCapitalization;
-  final bool alignEnd;
 
   /// Draws the focus underline beneath the field.
   final bool underline;
@@ -1383,7 +1389,7 @@ class _OnCardInput extends StatelessWidget {
       inputFormatters: formatters,
       keyboardType: keyboardType,
       textCapitalization: textCapitalization,
-      textAlign: alignEnd ? TextAlign.right : TextAlign.left,
+      textAlign: TextAlign.left,
       cursorColor: Colors.white,
       style: style,
       onChanged: onChanged,

@@ -1,6 +1,10 @@
+import 'dart:async';
+import 'dart:typed_data';
+
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart' show rootBundle;
+import 'package:flutter/services.dart' show CachingAssetBundle, rootBundle;
 import 'package:flutter/rendering.dart';
+import 'package:flutter_svg/flutter_svg.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import 'package:eganow_card/eganow_card.dart';
@@ -149,8 +153,84 @@ void main() {
 
     expect(find.text('5399  8402  1174  4821'), findsOneWidget);
     expect(find.text('ALEX TANTUO'), findsOneWidget);
-    expect(find.text('09/28'), findsOneWidget);
+    expect(find.text('09/28'), findsNothing);
+    expect(find.text('Card holder'), findsNothing);
+    expect(find.text('CARD HOLDER'), findsNothing);
+    expect(find.text('EXPIRY'), findsNothing);
     expect(find.byType(TextField), findsNothing);
+  });
+
+  testWidgets('the back shows the expiry, read-only', (tester) async {
+    await pumpCard(
+      tester,
+      const EganowCard(expiry: '09/28', cvc: '418', flipped: true),
+    );
+
+    expect(find.text('EXPIRY'), findsOneWidget);
+    expect(find.text('09/28'), findsOneWidget);
+  });
+
+  testWidgets('the back hints MM/YY at reduced opacity when empty', (
+    tester,
+  ) async {
+    await pumpCard(tester, const EganowCard(flipped: true));
+
+    final hint = find.text('MM/YY');
+    expect(hint, findsOneWidget);
+    final opacity = tester.widget<Opacity>(
+      find.ancestor(of: hint, matching: find.byType(Opacity)).first,
+    );
+    expect(opacity.opacity, lessThan(1));
+  });
+
+  testWidgets('the back conceals the expiry under hideDetails', (tester) async {
+    await pumpCard(
+      tester,
+      const EganowCard(expiry: '09/28', flipped: true, hideDetails: true),
+    );
+
+    expect(find.text('09/28'), findsNothing);
+    expect(find.text('••/••'), findsOneWidget);
+  });
+
+  testWidgets('a caller-supplied expiry controller is concealed on the back', (
+    tester,
+  ) async {
+    final controller = TextEditingController(text: '09/28');
+    addTearDown(controller.dispose);
+
+    await pumpCard(
+      tester,
+      EganowCard(
+        editable: const {EganowCardField.expiry},
+        controllers: {EganowCardField.expiry: controller},
+        flipped: true,
+        hideDetails: true,
+      ),
+    );
+
+    expect(find.text('09/28'), findsNothing);
+    expect(find.text('••/••'), findsOneWidget);
+    expect(find.byType(TextField), findsNothing);
+  });
+
+  testWidgets('focusing the expiry in the form flips the card to the back', (
+    tester,
+  ) async {
+    await pumpCard(
+      tester,
+      const EganowCard(
+        editable: {EganowCardField.expiry},
+        entry: EganowCardEntry.form,
+      ),
+    );
+
+    expect(find.text('EXPIRY'), findsOneWidget);
+
+    await tester.tap(find.byType(TextField));
+    await settle(tester);
+
+    expect(find.text('EXPIRY'), findsNWidgets(2));
   });
 
   testWidgets('editable fields become text fields on the artwork', (
@@ -161,8 +241,8 @@ void main() {
       EganowCard(editable: EganowCardField.values.toSet()),
     );
 
-    // PAN, holder and expiry live on the front; the CVC is on the back.
-    expect(find.byType(TextField), findsNWidgets(3));
+    // PAN and holder live on the front; the expiry and CVC are on the back.
+    expect(find.byType(TextField), findsNWidgets(2));
   });
 
   testWidgets('tapping turns the card over to reveal the CVC', (tester) async {
@@ -175,6 +255,63 @@ void main() {
 
     expect(find.text('CVV'), findsOneWidget);
     expect(find.byType(TextField), findsOneWidget);
+  });
+
+  group('the form fields drive the flip', () {
+    Future<void> pumpForm(WidgetTester tester, {bool? flipped}) => pumpCard(
+      tester,
+      EganowCard(
+        editable: const {EganowCardField.pan, EganowCardField.expiry},
+        entry: EganowCardEntry.form,
+        flipped: flipped,
+      ),
+    );
+
+    final onBack = find.text(EganowCard.defaultLegalText);
+
+    testWidgets('focusing PAN or holder after the expiry un-flips', (
+      tester,
+    ) async {
+      await pumpCard(
+        tester,
+        const EganowCard(
+          editable: {
+            EganowCardField.pan,
+            EganowCardField.holder,
+            EganowCardField.expiry,
+          },
+          entry: EganowCardEntry.form,
+        ),
+      );
+      final fields = find.byType(TextField);
+
+      expect(onBack, findsNothing);
+
+      await tester.tap(fields.at(2));
+      await settle(tester);
+      expect(onBack, findsOneWidget);
+
+      await tester.tap(fields.at(0));
+      await settle(tester);
+      expect(onBack, findsNothing);
+
+      await tester.tap(fields.at(2));
+      await settle(tester);
+      expect(onBack, findsOneWidget);
+
+      await tester.tap(fields.at(1));
+      await settle(tester);
+      expect(onBack, findsNothing);
+    });
+
+    testWidgets('a driven flipped: false ignores expiry focus', (tester) async {
+      await pumpForm(tester, flipped: false);
+
+      await tester.tap(find.byType(TextField).last);
+      await settle(tester);
+
+      expect(onBack, findsNothing);
+    });
   });
 
   testWidgets('PAN entry is grouped and reported', (tester) async {
@@ -205,34 +342,39 @@ void main() {
       ),
     );
 
+    await tester.tap(find.byType(EganowCard));
+    await settle(tester);
     await tester.enterText(find.byType(TextField), '0928');
     await settle(tester);
 
     expect(seen[EganowCardField.expiry], '09/28');
   });
 
-  testWidgets('hideDetails conceals every value on the front', (tester) async {
-    await pumpCard(
-      tester,
-      const EganowCard(
-        pan: '5399  8402  1174  4821',
-        holder: 'Alex Tantuo',
-        expiry: '09/28',
-        hideDetails: true,
-      ),
-    );
+  testWidgets(
+    'hideDetails conceals the PAN and holder on the front, which has no expiry',
+    (tester) async {
+      await pumpCard(
+        tester,
+        const EganowCard(
+          pan: '5399  8402  1174  4821',
+          holder: 'Alex Tantuo',
+          expiry: '09/28',
+          hideDetails: true,
+        ),
+      );
 
-    // The PAN keeps its last four so the card stays identifiable.
-    expect(find.text('••••  ••••  ••••  4821'), findsOneWidget);
-    expect(find.text('5399  8402  1174  4821'), findsNothing);
+      // The PAN keeps its last four so the card stays identifiable.
+      expect(find.text('••••  ••••  ••••  4821'), findsOneWidget);
+      expect(find.text('5399  8402  1174  4821'), findsNothing);
 
-    // Name and expiry are replaced outright — the name by a fixed-length run,
-    // so its length isn't leaked either.
-    expect(find.text('ALEX TANTUO'), findsNothing);
-    expect(find.text('••••••••••••'), findsOneWidget);
-    expect(find.text('09/28'), findsNothing);
-    expect(find.text('••/••'), findsOneWidget);
-  });
+      // Name and expiry are replaced outright — the name by a fixed-length run,
+      // so its length isn't leaked either.
+      expect(find.text('ALEX TANTUO'), findsNothing);
+      expect(find.text('••••••••••••'), findsOneWidget);
+      expect(find.text('09/28'), findsNothing);
+      expect(find.text('••/••'), findsNothing);
+    },
+  );
 
   testWidgets('the full PAN fits between the card margins at any size', (
     tester,
@@ -952,8 +1094,265 @@ void main() {
     });
   });
 
+  testWidgets('the back expiry never overlaps the legal text', (tester) async {
+    tester.view.physicalSize = const Size(402, 900);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.reset);
+
+    for (final width in <double>[200, 280, 362]) {
+      for (final scale in <double>[1.0, 1.5, 2.0]) {
+        await tester.pumpWidget(
+          MaterialApp(
+            home: MediaQuery(
+              data: MediaQueryData(textScaler: TextScaler.linear(scale)),
+              child: Scaffold(
+                body: Center(
+                  child: SizedBox(
+                    width: width,
+                    child: const EganowCard(
+                      expiry: '09/28',
+                      cvc: '418',
+                      flipped: true,
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ),
+        );
+        await settle(tester);
+
+        final value = tester.getRect(find.text('09/28'));
+        final legal = tester.getRect(find.text(EganowCard.defaultLegalText));
+        expect(
+          value.bottom,
+          lessThanOrEqualTo(legal.top),
+          reason: 'width $width, scale $scale',
+        );
+      }
+    }
+  });
+
+  group('the network logo', () {
+    Finder logo(String label) => find.bySemanticsLabel(label);
+
+    testWidgets('is absent unless a network is given', (tester) async {
+      await pumpCard(tester, const EganowCard(pan: EganowCard.samplePan));
+      expect(logo('Visa'), findsNothing);
+      expect(logo('Mastercard'), findsNothing);
+    });
+
+    for (final (network, label) in [
+      (EganowCardNetwork.visa, 'Visa'),
+      (EganowCardNetwork.mastercard, 'Mastercard'),
+    ]) {
+      testWidgets('draws $label on the front only', (tester) async {
+        await pumpCard(
+          tester,
+          EganowCard(pan: EganowCard.samplePan, network: network),
+        );
+        expect(logo(label), findsOneWidget);
+
+        await tester.tap(find.byType(EganowCard));
+        await settle(tester);
+        expect(find.text(EganowCard.defaultLegalText), findsOneWidget);
+        expect(logo(label), findsNothing);
+      });
+    }
+
+    for (final (network, asset) in [
+      (EganowCardNetwork.visa, 'assets/images/visa.svg'),
+      (EganowCardNetwork.mastercard, 'assets/images/mastercard.svg'),
+    ]) {
+      testWidgets('${network.name} loads $asset from the package', (
+        tester,
+      ) async {
+        await pumpCard(
+          tester,
+          EganowCard(pan: EganowCard.samplePan, network: network),
+        );
+        final loader =
+            tester.widget<SvgPicture>(find.byType(SvgPicture)).bytesLoader
+                as SvgAssetLoader;
+        expect(loader.assetName, asset);
+        expect(loader.packageName, EganowCard.assetPackage);
+      });
+    }
+
+    for (final network in EganowCardNetwork.values) {
+      for (final (name, card) in <(String, EganowCard Function())>[
+        ('a holder', () => EganowCard(holder: 'Alex Tantuo', network: network)),
+        ('no holder', () => EganowCard(network: network)),
+        (
+          'concealed',
+          () => EganowCard(
+            holder: 'Alex Tantuo',
+            network: network,
+            hideDetails: true,
+          ),
+        ),
+        (
+          'an editable holder',
+          () => EganowCard(
+            network: network,
+            editable: const {EganowCardField.holder},
+          ),
+        ),
+      ]) {
+        testWidgets('${network.name} is centred on the holder with $name', (
+          tester,
+        ) async {
+          await pumpCard(tester, card());
+          double centre(RenderBox b) =>
+              b.localToGlobal(b.size.center(Offset.zero)).dy;
+          final holderBox = find
+              .descendant(
+                of: find.byType(EganowCard),
+                matching: find.byWidgetPredicate(
+                  (w) => w is Text || w is EditableText,
+                ),
+              )
+              .evaluate()
+              .map((e) => e.renderObject! as RenderBox)
+              .reduce((a, b) => centre(a) > centre(b) ? a : b);
+          final logoBox = tester.renderObject<RenderBox>(
+            find.descendant(
+              of: logo(network.label),
+              matching: find.byType(DecoratedBox),
+            ),
+          );
+          expect(centre(logoBox), closeTo(centre(holderBox), 0.5));
+        });
+      }
+    }
+
+    testWidgets('is not concealed by hideDetails', (tester) async {
+      await pumpCard(
+        tester,
+        const EganowCard(
+          pan: EganowCard.samplePan,
+          network: EganowCardNetwork.mastercard,
+          hideDetails: true,
+        ),
+      );
+      expect(logo('Mastercard'), findsOneWidget);
+    });
+
+    for (final network in EganowCardNetwork.values) {
+      testWidgets(
+        'does not overflow narrow cards at large text scale: ${network.name}',
+        (tester) async {
+          tester.view.physicalSize = const Size(402, 900);
+          tester.view.devicePixelRatio = 1.0;
+          addTearDown(tester.view.reset);
+
+          await tester.pumpWidget(
+            MaterialApp(
+              home: MediaQuery(
+                data: const MediaQueryData(textScaler: TextScaler.linear(2)),
+                child: Scaffold(
+                  body: Center(
+                    child: SizedBox(
+                      width: 200,
+                      child: EganowCard(
+                        holder: 'Alexandra Tantuo-Mensah',
+                        network: network,
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          );
+          await settle(tester);
+          await tester.runAsync(
+            () => Future<void>.delayed(const Duration(milliseconds: 200)),
+          );
+          await tester.pump();
+          expect(tester.takeException(), isNull);
+        },
+      );
+
+      for (final stalled in [true, false]) {
+        testWidgets(
+          '${network.name} is final-size ${stalled ? 'before' : 'after'} '
+          'the SVG loads',
+          (tester) async {
+            tester.view.physicalSize = const Size(402, 900);
+            tester.view.devicePixelRatio = 1.0;
+            addTearDown(tester.view.reset);
+            await tester.pumpWidget(
+              DefaultAssetBundle(
+                bundle: stalled ? _StalledBundle() : rootBundle,
+                child: MaterialApp(
+                  home: Scaffold(
+                    body: Center(
+                      child: SizedBox(
+                        width: 362,
+                        child: EganowCard(
+                          holder: 'Alex Tantuo',
+                          network: network,
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            );
+            if (!stalled) {
+              await tester.runAsync(
+                () => Future<void>.delayed(const Duration(milliseconds: 200)),
+              );
+              await tester.pump();
+              await tester.pump();
+            }
+
+            final pill = tester.getSize(
+              find.descendant(
+                of: find.bySemanticsLabel(network.label),
+                matching: find.byType(DecoratedBox),
+              ),
+            );
+            final (height, aspect) = switch (network) {
+              EganowCardNetwork.visa => (3.4, 81 / 27),
+              EganowCardNetwork.mastercard => (5.2, 72 / 56),
+            };
+            const pad = 362 * 0.008;
+            expect(pill.height, closeTo(362 * height / 100 + 2 * pad, 0.01));
+            expect(
+              pill.width,
+              closeTo(362 * height / 100 * aspect + 2 * pad, 0.01),
+            );
+          },
+        );
+      }
+    }
+  });
+
   group('the security code caption', () {
-    testWidgets('is CVV by default, on the back and in the form', (
+    for (final (network, caption) in [
+      (EganowCardNetwork.visa, 'CVV'),
+      (EganowCardNetwork.mastercard, 'CVC'),
+    ]) {
+      testWidgets('follows the network: ${network.name} is $caption', (
+        tester,
+      ) async {
+        await pumpCard(
+          tester,
+          EganowCard(
+            cvc: '418',
+            editable: const {EganowCardField.cvc},
+            entry: EganowCardEntry.form,
+            flipped: true,
+            network: network,
+          ),
+        );
+
+        expect(find.text(caption), findsNWidgets(2));
+      });
+    }
+
+    testWidgets('is CVV with no network, on the back and in the form', (
       tester,
     ) async {
       await pumpCard(
@@ -969,22 +1368,6 @@ void main() {
       // Once on the artwork, once as the form field's label.
       expect(find.text('CVV'), findsNWidgets(2));
       expect(find.text('CVC'), findsNothing);
-    });
-
-    testWidgets('follows securityCodeLabel', (tester) async {
-      await pumpCard(
-        tester,
-        const EganowCard(
-          cvc: '418',
-          editable: {EganowCardField.cvc},
-          entry: EganowCardEntry.form,
-          flipped: true,
-          securityCodeLabel: EganowSecurityCodeLabel.cvc,
-        ),
-      );
-
-      expect(find.text('CVC'), findsNWidgets(2));
-      expect(find.text('CVV'), findsNothing);
     });
   });
 
@@ -1165,4 +1548,9 @@ void main() {
       );
     }, (tester) => paragraphOf(tester, masked));
   });
+}
+
+class _StalledBundle extends CachingAssetBundle {
+  @override
+  Future<ByteData> load(String key) => Completer<ByteData>().future;
 }

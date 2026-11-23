@@ -19,7 +19,7 @@ EganowCard(
 | | |
 | --- | --- |
 | `tier` | Which design to render — picks the artwork, its measured corner radius, and the back gradient. |
-| `pan` `holder` `expiry` `cvc` | Values. For an editable field these seed its controller. |
+| `pan` `holder` `expiry` `cvc` | Values. For an editable field these seed its controller. The PAN and holder are on the front; the expiry and CVC are on the back, so focusing an editable expiry turns the card over. |
 | `editable` | The set of fields that can be edited. Leave it empty for a read-only card: no inputs and no form. |
 | `entry` | `onCard` types in place on the artwork; `form` keeps the card read-only and collects the fields beneath it. |
 | `controllers` | Supply your own per field to drive the card from an enclosing form. |
@@ -34,7 +34,7 @@ EganowCard(
 | `hideBalance` | Whether the balance is concealed. Null (the default) lets the card own the eye; pass a value to drive it. Independent of `hideDetails` — see below. |
 | `onBalanceVisibilityChanged` | Fires with the concealment state being asked for when the eye is tapped, driven or not. |
 | `medium` | Badges the front `Virtual` or `Physical`, top left. Null (the default) draws no badge. Not concealed by `hideDetails` — which medium a card is isn't a secret. |
-| `securityCodeLabel` | Captions the security code `CVV` (the default) or `CVC`, on the back and on the form field. Only the caption — the slot stays `EganowCardField.cvc`. |
+| `network` | Draws the Visa or Mastercard logo bottom right on the front, in the spot the expiry used to occupy. Also captions the security code on the back and on the form field: `CVC` for Mastercard, `CVV` for Visa or no network. Null (the default) draws no logo. Not concealed by `hideDetails`. |
 | `flipped` | Leave null to let the card manage its own flip; pass a value to drive it. |
 | `width` | Fills its parent when null. |
 
@@ -135,9 +135,14 @@ nothing about the mark.
   host project, change it in both places or the artwork will not load.
 - **Fonts are bundled, not fetched.** Urbanist and Roboto Mono ship in
   [`assets/fonts/`](assets/fonts) and are declared in `pubspec.yaml`, so the
-  card's metrics hold offline and the package has no third-party dependency.
+  card's metrics hold offline.
   Only the weights the card paints are included (400/500/600/700, plus
   Urbanist italic at 400 and 600) — reach for them through `EganowFonts`
   rather than naming the families by hand, so the `package:` prefix that
   resolves them stays in one place. Both are SIL Open Font Licensed; the
   licences sit beside the faces.
+- **Network logos are SVGs.** `assets/images/visa.svg` and
+  `assets/images/mastercard.svg` are rendered with `flutter_svg`, the package's
+  one third-party dependency, and are declared through the `assets/images/`
+  directory entry in `pubspec.yaml`. Each sits on a white pill because the
+  marks are dark and would vanish on the card faces.
