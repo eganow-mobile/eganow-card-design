@@ -64,3 +64,18 @@ python3 tool/shrink_logo.py /tmp/card_src
 
 An optional second argument writes somewhere other than `assets/images`. Change
 `LOGO_SCALE` and re-run for another size. Takes about a minute (numpy only).
+
+## Trimming the network logos
+
+`logo_visa.png` and `logo_mastercard.png` are exported as 256x256 squares with
+wide transparent padding. `trim_logos.py` crops each one in place to its alpha
+bounding box plus a 2px transparent margin (pixels inside the crop are
+untouched, still RGBA), so the card can size and align the visible artwork.
+
+```
+PYTHONPATH=tool python3 tool/trim_logos.py
+```
+
+Needs numpy and `png_tool.py` only. It is idempotent. Current results: Visa
+223x76, Mastercard 201x126; `_networkLogo` in `lib/src/eganow_card.dart`
+hardcodes those aspect ratios, so update them if the artwork changes.

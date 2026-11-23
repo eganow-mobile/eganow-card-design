@@ -141,8 +141,10 @@ nothing about the mark.
   rather than naming the families by hand, so the `package:` prefix that
   resolves them stays in one place. Both are SIL Open Font Licensed; the
   licences sit beside the faces.
-- **Network logos are SVGs.** `assets/images/visa.svg` and
-  `assets/images/mastercard.svg` are rendered with `flutter_svg`, the package's
-  one third-party dependency, and are declared through the `assets/images/`
-  directory entry in `pubspec.yaml`. Each sits on a white pill because the
-  marks are dark and would vanish on the card faces.
+- **Network logos are transparent PNGs.** `assets/images/logo_visa.png` and
+  `assets/images/logo_mastercard.png` are drawn bare on the card face, with no
+  backing pill, and are declared through the `assets/images/` directory entry
+  in `pubspec.yaml`. They are cropped to their visible artwork (plus a 2px
+  margin) by `tool/trim_logos.py`, so the sizes and aspect ratios in
+  `_networkLogo` describe the artwork rather than a padded square. Visa's blue
+  is low-contrast on the Boss card.

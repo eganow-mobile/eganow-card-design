@@ -2,7 +2,6 @@ import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:flutter_svg/flutter_svg.dart';
 
 import 'card_input_formatters.dart';
 import 'css_gradients.dart';
@@ -1056,33 +1055,28 @@ class _EganowCardState extends State<EganowCard> with TickerProviderStateMixin {
 
   Widget _networkLogo(EganowCardMetrics m, EganowCardNetwork network) {
     final (asset, height, aspect) = switch (network) {
-      EganowCardNetwork.visa => ('assets/images/visa.svg', m.cqw(3.4), 81 / 27),
+      EganowCardNetwork.visa => (
+        'assets/images/logo_visa.png',
+        m.cqw(3.5),
+        223 / 76,
+      ),
       EganowCardNetwork.mastercard => (
-        'assets/images/mastercard.svg',
-        m.cqw(5.2),
-        72 / 56,
+        'assets/images/logo_mastercard.png',
+        m.cqw(5.1),
+        201 / 126,
       ),
     };
 
-    // Both marks carry dark ink (Visa's blue, Mastercard's black wordmark) that
-    // disappears on the card faces, so they sit on a white pill.
     return Semantics(
       label: network.label,
       image: true,
       child: ExcludeSemantics(
-        child: DecoratedBox(
-          decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(m.cqw(1.1)),
-          ),
-          child: Padding(
-            padding: EdgeInsets.all(m.cqw(0.8)),
-            child: SizedBox(
-              width: height * aspect,
-              height: height,
-              child: SvgPicture.asset(asset, package: EganowCard.assetPackage),
-            ),
-          ),
+        child: Image.asset(
+          asset,
+          package: EganowCard.assetPackage,
+          width: height * aspect,
+          height: height,
+          filterQuality: FilterQuality.high,
         ),
       ),
     );

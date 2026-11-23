@@ -1,10 +1,6 @@
-import 'dart:async';
-import 'dart:typed_data';
-
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart' show CachingAssetBundle, rootBundle;
+import 'package:flutter/services.dart' show rootBundle;
 import 'package:flutter/rendering.dart';
-import 'package:flutter_svg/flutter_svg.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import 'package:eganow_card/eganow_card.dart';
@@ -1161,8 +1157,8 @@ void main() {
     }
 
     for (final (network, asset) in [
-      (EganowCardNetwork.visa, 'assets/images/visa.svg'),
-      (EganowCardNetwork.mastercard, 'assets/images/mastercard.svg'),
+      (EganowCardNetwork.visa, 'assets/images/logo_visa.png'),
+      (EganowCardNetwork.mastercard, 'assets/images/logo_mastercard.png'),
     ]) {
       testWidgets('${network.name} loads $asset from the package', (
         tester,
@@ -1171,11 +1167,16 @@ void main() {
           tester,
           EganowCard(pan: EganowCard.samplePan, network: network),
         );
-        final loader =
-            tester.widget<SvgPicture>(find.byType(SvgPicture)).bytesLoader
-                as SvgAssetLoader;
-        expect(loader.assetName, asset);
-        expect(loader.packageName, EganowCard.assetPackage);
+        final image = tester.widget<Image>(
+          find.descendant(
+            of: logo(network.label),
+            matching: find.byType(Image),
+          ),
+        );
+        expect(image.image, isA<AssetImage>());
+        final provider = image.image as AssetImage;
+        expect(provider.assetName, asset);
+        expect(provider.package, EganowCard.assetPackage);
       });
     }
 
@@ -1218,7 +1219,7 @@ void main() {
           final logoBox = tester.renderObject<RenderBox>(
             find.descendant(
               of: logo(network.label),
-              matching: find.byType(DecoratedBox),
+              matching: find.byType(Image),
             ),
           );
           expect(centre(logoBox), closeTo(centre(holderBox), 0.5));
@@ -1273,59 +1274,28 @@ void main() {
         },
       );
 
-      for (final stalled in [true, false]) {
-        testWidgets(
-          '${network.name} is final-size ${stalled ? 'before' : 'after'} '
-          'the SVG loads',
-          (tester) async {
-            tester.view.physicalSize = const Size(402, 900);
-            tester.view.devicePixelRatio = 1.0;
-            addTearDown(tester.view.reset);
-            await tester.pumpWidget(
-              DefaultAssetBundle(
-                bundle: stalled ? _StalledBundle() : rootBundle,
-                child: MaterialApp(
-                  home: Scaffold(
-                    body: Center(
-                      child: SizedBox(
-                        width: 362,
-                        child: EganowCard(
-                          holder: 'Alex Tantuo',
-                          network: network,
-                        ),
-                      ),
-                    ),
-                  ),
-                ),
-              ),
-            );
-            if (!stalled) {
-              await tester.runAsync(
-                () => Future<void>.delayed(const Duration(milliseconds: 200)),
-              );
-              await tester.pump();
-              await tester.pump();
-            }
-
-            final pill = tester.getSize(
-              find.descendant(
-                of: find.bySemanticsLabel(network.label),
-                matching: find.byType(DecoratedBox),
-              ),
-            );
-            final (height, aspect) = switch (network) {
-              EganowCardNetwork.visa => (3.4, 81 / 27),
-              EganowCardNetwork.mastercard => (5.2, 72 / 56),
-            };
-            const pad = 362 * 0.008;
-            expect(pill.height, closeTo(362 * height / 100 + 2 * pad, 0.01));
-            expect(
-              pill.width,
-              closeTo(362 * height / 100 * aspect + 2 * pad, 0.01),
-            );
-          },
+      testWidgets('${network.name} reserves its final size before the image '
+          'decodes', (tester) async {
+        tester.view.physicalSize = const Size(402, 900);
+        tester.view.devicePixelRatio = 1.0;
+        addTearDown(tester.view.reset);
+        await tester.pumpWidget(
+          wrap(EganowCard(holder: 'Alex Tantuo', network: network)),
         );
-      }
+
+        final size = tester.getSize(
+          find.descendant(
+            of: logo(network.label),
+            matching: find.byType(Image),
+          ),
+        );
+        final (height, aspect) = switch (network) {
+          EganowCardNetwork.visa => (3.5, 223 / 76),
+          EganowCardNetwork.mastercard => (5.1, 201 / 126),
+        };
+        expect(size.height, closeTo(362 * height / 100, 0.01));
+        expect(size.width, closeTo(362 * height / 100 * aspect, 0.01));
+      });
     }
   });
 
@@ -1548,9 +1518,4 @@ void main() {
       );
     }, (tester) => paragraphOf(tester, masked));
   });
-}
-
-class _StalledBundle extends CachingAssetBundle {
-  @override
-  Future<ByteData> load(String key) => Completer<ByteData>().future;
 }
